@@ -1329,29 +1329,16 @@ const uint32_t bjorklund_patterns[] = {
 };
 
 bool EuclideanFilter(uint8_t num_steps, uint8_t num_beats, uint8_t rotation, uint32_t clock) {
-  if (num_beats > (num_steps + 1)) {
-    num_beats = num_steps + 1;
-  }
-  uint32_t pattern = bjorklund_patterns[((num_steps - 1) * 33) + num_beats]; 
-  if (rotation) {
-    // Serial.print(pattern);
-    // Serial.print("\n");
-    rotation = rotation % (num_steps + 1);
-    pattern = rotl32(pattern, num_steps, rotation) ;
-    // Serial.print(pattern);
-    // Serial.print("\n------\n");
-  }
-  uint8_t position = clock % (num_steps + 1) ;
-  return static_cast<bool>(pattern & (0x01 << position)) ;
+  uint32_t pattern = EuclideanPattern(num_steps, num_beats, rotation);
+  clock %= num_steps;
+  return static_cast<bool>(pattern & (0x01 << clock)) ;
 }
 
 uint32_t EuclideanPattern(uint8_t num_steps, uint8_t num_beats, uint8_t rotation) {
-  if (num_beats > (num_steps + 1)) {
-    num_beats = num_steps + 1;
-  }
-  uint32_t pattern = bjorklund_patterns[((num_steps - 1) * 33) + num_beats]; 
+  num_beats %= (num_steps + 1);
+  uint32_t pattern = bjorklund_patterns[((num_steps - 2) * 33) + num_beats];
   if (rotation) {
-    rotation = rotation % (num_steps + 1);
+    rotation %= num_steps;
     pattern = rotl32(pattern, num_steps, rotation) ;
   }
   return pattern;
