@@ -22,10 +22,8 @@
 
 #include "bjorklund.h"
 
-const int NUM_PARAMS = 3;
+const int NUM_PARAMS = 4;
 const int PARAM_SIZE = 5;
-const int OUTER_RADIUS = 24;
-const int INNER_RADIUS = 16;
 
 class AnnularFusion : public HemisphereApplet {
 public:
@@ -37,38 +35,60 @@ public:
     void Start() {
         ForEachChannel(ch)
         {
-            length[ch] = 16;
-            beats[ch] = 4 + (ch * 4);
-            pattern[ch] = EuclideanPattern(length[ch], beats[ch], 0);;
+            actual_length[ch] = length[ch] = 16;
+            actual_beats[ch] = beats[ch] = 4 + (ch * 4);
+            actual_offset[ch] = offset[ch] = 0;
+            pattern[ch] = EuclideanPattern(length[ch], beats[ch], 0);
         }
         step = 0;
-        last_clock = OC::CORE::ticks;
     }
 
     void Controller() {
         if (Clock(1)) step = 0; // Reset
 
+        int cv_data[2];
+        cv_data[0] = DetentedIn(0);
+        cv_data[1] = DetentedIn(1);
+
+        // continuously recalculate pattern with CV offsets
         ForEachChannel(ch) {
-            int rotation = Proportion(DetentedIn(ch), HEMISPHERE_MAX_CV, length[ch]);
+            actual_length[ch] = length[ch];
+            actual_beats[ch] = beats[ch];
+            actual_offset[ch] = offset[ch];
+
+            // process CV inputs
+            ForEachChannel(cv_ch) {
+                switch (cv_dest[cv_ch] - ch * (NUM_PARAMS-1)) {
+                case 0: // length
+                    actual_length[ch] = constrain(actual_length[ch] + Proportion(cv_data[cv_ch], HEMISPHERE_MAX_CV, 31), 1, 32);
+                    break;
+                case 1: // beats
+                    actual_beats[ch] = constrain(actual_beats[ch] + Proportion(cv_data[cv_ch], HEMISPHERE_MAX_CV, actual_length[ch]), 1, actual_length[ch]);
+                    break;
+                case 2: // offset
+                    actual_offset[ch] = constrain(actual_offset[ch] + Proportion(cv_data[cv_ch], HEMISPHERE_MAX_CV, actual_length[ch]), 0, actual_length[ch]-1);
+                    break;
+                default: break;
+                }
+            }
+
             // Store the pattern for display
-            pattern[ch] = EuclideanPattern(length[ch], beats[ch], rotation + offset[ch]);
+            pattern[ch] = EuclideanPattern(actual_length[ch], actual_beats[ch], actual_offset[ch]);
         }
 
-
-        // Advance both rings
+        // Process triggers and step forward on clock
         if (Clock(0)) {
-            last_clock = OC::CORE::ticks;
-            ForEachChannel(ch)
-            {
 
-                int sb = step % length[ch];
+            ForEachChannel(ch) {
+                // actually output the triggers
+                int sb = step % actual_length[ch];
                 if ((pattern[ch] >> sb) & 0x01) {
                     ClockOut(ch);
                 }
             }
 
             // Plan for the thing to run forever and ever
-            if (++step >= length[0] * length[1]) step = 0;
+            if (++step >= actual_length[0] * actual_length[1]) step = 0;
         }
     }
 
@@ -79,23 +99,27 @@ public:
     }
 
     void OnButtonPress() {
-        if (++cursor > 5) cursor = 0;
+        if (++cursor > 7) cursor = 0;
         ResetCursor();
     }
 
     void OnEncoderMove(int direction) {
         int ch = cursor < NUM_PARAMS ? 0 : 1;
         int f = cursor - (ch * NUM_PARAMS); // Cursor function
-        if (f == 0) {
-            length[ch] = constrain(length[ch] + direction, 3, 32);
+        switch (f) {
+        case 0:
+            actual_length[ch] = length[ch] = constrain(length[ch] + direction, 3, 32);
             if (beats[ch] > length[ch]) beats[ch] = length[ch];
-            if (offset[ch] > length[ch]) offset[ch] = length[ch];
-        }
-        if (f == 1) {
-            beats[ch] = constrain(beats[ch] + direction, 1, length[ch]);
-        }
-        if (f == 2) {
-            offset[ch] = constrain(offset[ch] + direction, 0, length[ch] - 1);
+            if (offset[ch] >= length[ch]) offset[ch] = length[ch]-1;
+            break;
+        case 1:
+            actual_beats[ch] = beats[ch] = constrain(beats[ch] + direction, 1, length[ch]);
+            break;
+        case 2:
+            actual_offset[ch] = offset[ch] = constrain(offset[ch] + direction, 0, length[ch] - 1);
+            break;
+        case 3: // CV destination
+            cv_dest[ch] = constrain(cv_dest[ch] + direction, 0, 5);
         }
     }
 
@@ -107,25 +131,29 @@ public:
         Pack(data, PackLocation {3 * PARAM_SIZE, PARAM_SIZE}, beats[1] - 1);
         Pack(data, PackLocation {4 * PARAM_SIZE, PARAM_SIZE}, offset[0]);
         Pack(data, PackLocation {5 * PARAM_SIZE, PARAM_SIZE}, offset[1]);
+        Pack(data, PackLocation {6 * PARAM_SIZE, PARAM_SIZE}, cv_dest[0]);
+        Pack(data, PackLocation {7 * PARAM_SIZE, PARAM_SIZE}, cv_dest[1]);
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
-        length[0] = Unpack(data, PackLocation {0 * PARAM_SIZE, PARAM_SIZE}) + 1;
-        beats[0]  = Unpack(data, PackLocation {1 * PARAM_SIZE, PARAM_SIZE}) + 1;
-        length[1] = Unpack(data, PackLocation {2 * PARAM_SIZE, PARAM_SIZE}) + 1;
-        beats[1]  = Unpack(data, PackLocation {3 * PARAM_SIZE, PARAM_SIZE}) + 1;
-        offset[0] = Unpack(data, PackLocation {4 * PARAM_SIZE, PARAM_SIZE});
-        offset[1] = Unpack(data, PackLocation {5 * PARAM_SIZE, PARAM_SIZE});
+        actual_length[0] = length[0] = Unpack(data, PackLocation {0 * PARAM_SIZE, PARAM_SIZE}) + 1;
+        actual_beats[0]  = beats[0]  = Unpack(data, PackLocation {1 * PARAM_SIZE, PARAM_SIZE}) + 1;
+        actual_length[1] = length[1] = Unpack(data, PackLocation {2 * PARAM_SIZE, PARAM_SIZE}) + 1;
+        actual_beats[1]  = beats[1]  = Unpack(data, PackLocation {3 * PARAM_SIZE, PARAM_SIZE}) + 1;
+        actual_offset[0] = offset[0] = Unpack(data, PackLocation {4 * PARAM_SIZE, PARAM_SIZE});
+        actual_offset[1] = offset[1] = Unpack(data, PackLocation {5 * PARAM_SIZE, PARAM_SIZE});
+        cv_dest[0] = Unpack(data, PackLocation {6 * PARAM_SIZE, PARAM_SIZE});
+        cv_dest[1] = Unpack(data, PackLocation {7 * PARAM_SIZE, PARAM_SIZE});
     }
 
 protected:
     void SetHelp() {
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
-        help[HEMISPHERE_HELP_CVS]      = "Rotate 1=Ch1 2=Ch2";
+        help[HEMISPHERE_HELP_CVS]      = "Assignable";
         help[HEMISPHERE_HELP_OUTS]     = "Clock A=Ch1 B=Ch2";
-        help[HEMISPHERE_HELP_ENCODER]  = "Len/Hits/Rot Ch1,2";
+        help[HEMISPHERE_HELP_ENCODER]  = "Len/Hits/Rot/CV";
         //                               "------------------" <-- Size Guide
     }
 
@@ -133,12 +161,16 @@ private:
     int step;
     int cursor = 0; // Ch1: 0=Length, 1=Hits; Ch2: 2=Length 3=Hits
     uint32_t pattern[2];
-    int last_clock;
 
     // Settings
-    int length[2];
-    int beats[2];
-    int offset[2];
+    uint8_t length[2];
+    uint8_t beats[2];
+    uint8_t offset[2];
+    uint8_t actual_length[2];
+    uint8_t actual_beats[2];
+    uint8_t actual_offset[2];
+
+    uint8_t cv_dest[2];
 
     void DrawSteps() {
         //int spacing = 1;
@@ -148,14 +180,14 @@ private:
         gfxLine(0, 54, 63, 54);
         ForEachChannel(ch) {
             for (int i = 0; i < 16; i++) {
-                if ((pattern[ch] >> ((i + step) % length[ch])) & 0x1) {
+                if ((pattern[ch] >> ((i + step) % actual_length[ch])) & 0x1) {
                     gfxRect(4 * i + 1, 48 + 9 * ch, 3, 3);
                     //gfxLine(4 * i + 2, 47 + 9 * ch, 4 * i + 2, 47 + 9 * ch + 4);
                 } else {
                     gfxPixel(4 * i + 2, 47 + 9 * ch + 2);
                 }
 
-                if ((i + step) % length[ch] == 0) {
+                if ((i + step) % actual_length[ch] == 0) {
                     //gfxLine(4 * i, 46 + 9 * ch, 4 * i, 52 + 9 * ch);
                     gfxLine(4 * i, 46 + 9 * ch, 4 * i, 46 + 9 * ch + 1);
                     gfxLine(4 * i, 52 + 9 * ch - 1, 4 * i, 52 + 9 * ch);
@@ -165,22 +197,36 @@ private:
     }
 
     void DrawEditor() {
-        int spacing = 25;
+        int spacing = 18;
 
-        gfxBitmap(1 + 0 * spacing, 15, 8, LOOP_ICON);
-        gfxBitmap(1 + 1 * spacing, 15, 8, X_NOTE_ICON);
-        gfxBitmap(1 + 2 * spacing, 15, 8, LEFT_RIGHT_ICON);
+        gfxBitmap(4 + 0 * spacing, 15, 8, LOOP_ICON);
+        gfxBitmap(4 + 1 * spacing, 15, 8, X_NOTE_ICON);
+        gfxBitmap(4 + 2 * spacing, 15, 8, LEFT_RIGHT_ICON);
 
         ForEachChannel (ch) {
             int y = 15 + 10 * (ch + 1);
-            gfxPrint(1 + 0 * spacing, y, length[ch]);
-            if (cursor == 0 + ch * NUM_PARAMS) gfxCursor(1 + 0 * spacing, y + 7, 12);
+            gfxPrint(4 + 0 * spacing, y, actual_length[ch]);
+            gfxPrint(4 + 1 * spacing, y, actual_beats[ch]);
+            gfxPrint(4 + 2 * spacing, y, actual_offset[ch]);
 
-            gfxPrint(1 + 1 * spacing, y, beats[ch]);
-            if (cursor == 1 + ch * NUM_PARAMS) gfxCursor(1 + 1 * spacing, y + 7, 12);
+            int f = cursor - ch * NUM_PARAMS;
+            switch (f) {
+            case 0:
+            case 1:
+            case 2:
+                gfxCursor(4 + f * spacing, y + 7, 12);
+                break;
+            case 3: // CV dest selection
+                gfxBitmap(1 + 3 * spacing, y, 8, CV_ICON);
+                break;
+            }
 
-            gfxPrint(1 + 2 * spacing, y, offset[ch]);
-            if (cursor == 2 + ch * NUM_PARAMS) gfxCursor(1 + 2 * spacing, y + 7, 12);
+            // CV assignment indicators
+            ForEachChannel(ch_dest) {
+                int ff = cv_dest[ch_dest] - (NUM_PARAMS-1)*ch;
+                if (ff >= 0 && ff < (NUM_PARAMS-1))
+                    gfxBitmap(ff * spacing, y, 3, ch_dest?SUB_TWO:SUP_ONE);
+            }
         }
 
     }
