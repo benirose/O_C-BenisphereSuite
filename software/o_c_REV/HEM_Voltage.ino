@@ -64,7 +64,7 @@ public:
         uint8_t ch = cursor / 2;
         if (cursor == 0 || cursor == 2) {
             // Change voltage
-            int min = -HEMISPHERE_3V_CV / VOLTAGE_INCREMENTS;
+            int min = -HEMISPHERE_MAX_CV / VOLTAGE_INCREMENTS;
             int max = HEMISPHERE_MAX_CV / VOLTAGE_INCREMENTS;
             voltage[ch] = constrain(voltage[ch] + direction, min, max);
         } else {
