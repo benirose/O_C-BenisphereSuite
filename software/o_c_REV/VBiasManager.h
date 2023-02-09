@@ -32,7 +32,7 @@
 
 #ifdef VOR 
 
-#define BIAS_EDITOR_TIMEOUT 16666
+#define BIAS_EDITOR_TIMEOUT 20000
 
 class VBiasManager {
     static VBiasManager *instance;
