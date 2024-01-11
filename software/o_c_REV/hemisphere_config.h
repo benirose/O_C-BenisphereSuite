@@ -12,24 +12,21 @@
 // alone to avoid breaking forked codebases by other developers.
 
 //////////////////  id  cat   class name
+
+
 #define HEMISPHERE_APPLETS { \
     DECLARE_APPLET( 47, 0x09, ASR), \
-    DECLARE_APPLET( 56, 0x10, AttenuateOffset), \
     DECLARE_APPLET( 41, 0x41, Binary), \
     DECLARE_APPLET( 55, 0x80, BootsNCat), \
     DECLARE_APPLET( 51, 0x80, BugCrack), \
     DECLARE_APPLET( 31, 0x04, Burst), \
     DECLARE_APPLET( 12, 0x10, Calculate), \
-    DECLARE_APPLET( 64, 0x08, Chordinator), \
     DECLARE_APPLET(  6, 0x04, ClockDivider), \
     DECLARE_APPLET( 28, 0x04, ClockSkip), \
     DECLARE_APPLET( 30, 0x10, Compare), \
     DECLARE_APPLET( 18, 0x02, DualTM), \
-    DECLARE_APPLET(  7, 0x01, EbbAndLfo), \
     DECLARE_APPLET( 42, 0x11, EnvFollow), \
     DECLARE_APPLET( 15, 0x02, EuclidX), \
-    DECLARE_APPLET( 22, 0x01, GameOfLife), \
-    DECLARE_APPLET( 16, 0x80, LoFiPCM), \
     DECLARE_APPLET( 10, 0x44, Logic), \
     DECLARE_APPLET( 73, 0x08, MultiScale), \
     DECLARE_APPLET( 71, 0x02, Pigeons), \
