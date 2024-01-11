@@ -1,32 +1,23 @@
 [![PlatformIO CI](https://github.com/djphazer/O_C-BenisphereSuite/actions/workflows/firmware.yml/badge.svg)](https://github.com/djphazer/O_C-BenisphereSuite/actions/workflows/firmware.yml)
 
-Phazerville Suite - an active o_C firmware fork
+Phazerville Suite with Relabi - an active o_C firmware fork
 ===
 [![SynthDad's video overview](http://img.youtube.com/vi/XRGlAmz3AKM/0.jpg)](http://www.youtube.com/watch?v=XRGlAmz3AKM "Phazerville; newest firmware for Ornament and Crime. Tutorial and patch ideas")
 
 Watch SynthDad's **video overview** (above) or check the [**Wiki**](https://github.com/djphazer/O_C-BenisphereSuite/wiki) for more info. [Download it here](https://github.com/djphazer/O_C-BenisphereSuite/releases).
 
-## Stolen Ornaments
+## An active fork expanding upon Hemisphere Suite.
 
-Using [**Benisphere**](https://github.com/benirose/O_C-BenisphereSuite) as a starting point, this branch takes the **Hemisphere Suite** in new directions, with several new applets and enhancements to existing ones. I wanted to collect all the bleeding-edge features from other clever developers, with the goal of cramming as much functionality and flexibility into the nifty dual-applet design as possible!
+This is a fork of djphazer's Phazerville Suite which is a fork of Benisphere which is a fork of Hemisphere! The code is firmware for the Ornament & Crime, a Eurorack synth module that can act as many different modules as selected by the user. This firmware ads the Relabi app that generates chaotic but deterministic control voltage. In addition, it adds a function to the HSVectorOscillator.h file and provides a controller file that allows two Relabi apps to be linked, providing four related chaotic LFOs.
 
-I've also included **all of the stock O&C firmware apps**, but they don't all fit in one .hex. As a courtesy, I provide **3 different build choices** with various combinations of Apps in my [**Releases**](https://github.com/djphazer/O_C-BenisphereSuite/releases). I think of it like the boxed set of a movie trilogy or whatever. The O&C Saga. 4 different hardware format options. Free and Open Source, baby!
+Read more about the suite [here](https://github.com/djphazer/O_C-Phazerville). Please, go there and read about all the people who have contributed code.
 
-You can also customize the `platformio.ini` file to mix & match for yourself ;-)
+## What is Relabi.
 
-### New Crimes I've Committed
+Relabi is an alternative method of defining musical time. While rhythm is concerned with recurring pulses, relabi always slips the pulse. You can read all about the concept in [John Berndt's essay]((https://johnberndt.org/relabi/).
 
-* 4 Presets in the new [**Hemisphere Config**](https://github.com/djphazer/O_C-BenisphereSuite/wiki/Hemisphere-Config)
-* Modal-editing style cursor navigation (and other usability tweaks)
-* Expanded internal [**Clock Setup**](https://github.com/djphazer/O_C-BenisphereSuite/wiki/Clock-Setup)
-* New Apps: [**Scenes**](https://github.com/djphazer/O_C-BenisphereSuite/wiki/Scenes) and [**Calibr8or**](https://github.com/djphazer/O_C-BenisphereSuite/wiki/Calibr8or)
-* **[DualTM](https://github.com/djphazer/O_C-BenisphereSuite/wiki/DualTM)** - two 32-bit shift registers. Assignable I/O.
-* **[EbbAndLfo](https://github.com/djphazer/O_C-BenisphereSuite/wiki/Ebb-&-LFO)** (via [qiemem](https://github.com/qiemem/O_C-HemisphereSuite/tree/trig-and-tides)) - mini implementation of MI Tides, with v/oct tracking
-* **[EuclidX](https://github.com/djphazer/O_C-BenisphereSuite/wiki/EuclidX)** - AnnularFusion got a makeover, now includes padding, configurable CV input modulation - (credit to [qiemem](https://github.com/qiemem/O_C-HemisphereSuite/tree/expanded-clock-div) and [adegani](https://github.com/adegani/O_C-HemisphereSuite))
-* LoFi Tape has been transformed into **LoFi Echo** - a crazy bitcrushing digital delay line - (credit to [armandvedel](https://github.com/armandvedel/O_C-HemisphereSuite_log) for the initial idea)
-* Sequence5 -> **SequenceX** (8 steps max) (from [logarhythm](https://github.com/Logarhythm1/O_C-HemisphereSuite))
 
-Plus lots of other small tweaks + experimental applets.
+
 
 ### How To Get It
 
@@ -44,19 +35,3 @@ Have a look inside `platformio.ini` for alternative build environment configurat
 
 _**Pro-tip**_: If you decide to fork the project, and enable GitHub Actions on your own repo, GitHub will build the files for you... ;)
 
-## Credits
-
-Many minds before me have made this project possible. Attribution is present in the git commit log and within individual files.
-Shoutouts:
-* **[Logarhythm1](https://github.com/Logarhythm1)** for the incredible **TB-3PO** sequencer, as well as **Stairs**.
-* **[herrkami](https://github.com/herrkami)** and **Ben Rosenbach** for their work on **BugCrack**.
-* **[benirose](https://github.com/benirose)** also gets massive props for **DrumMap** and the **ProbDiv / ProbMelo** applets.
-* **[qiemem](https://github.com/qiemem)** (Bryan Head) for the **Ebb&LFO** applet and its _tideslite_ backend, among other things.
-
-And, of course, thank you to **[Chysn](https://github.com/Chysn)** for the clever applet framework from which we've all drawn inspiration.
-
-This is a fork of [Benisphere Suite](https://github.com/benirose/O_C-BenisphereSuite) which is a fork of [Hemisphere Suite](https://github.com/Chysn/O_C-HemisphereSuite) by Jason Justian (aka chysn).
-
-ornament**s** & crime**s** is a collaborative project by Patrick Dowling (aka pld), mxmxmx and Tim Churches (aka bennelong.bicyclist) (though mostly by pld and bennelong.bicyclist). it **(considerably) extends** the original firmware for the o_C / ASR eurorack module, designed by mxmxmx.
-
-http://ornament-and-cri.me/
