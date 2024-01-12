@@ -33,6 +33,8 @@ class RelabiManager {
     uint32_t registered[2];
     uint32_t lastRegistered[2];
     uint8_t hemRelabi;
+    uint8_t linkedFreqMultiplier;
+    uint8_t linkedFreqDivider;
     
 
     RelabiManager() {
@@ -75,6 +77,22 @@ public:
         value2 = lfo2;
         value3 = lfo3;
         value4 = lfo4;
+    }
+
+    void WriteMul(uint8_t lfm) {
+        linkedFreqMultiplier = lfm;
+    }
+
+    void ReadMul(uint8_t &lfm) const {
+        lfm = linkedFreqMultiplier;
+    }
+
+    void WriteDiv(uint8_t ldm) {
+        linkedFreqDivider = ldm;
+    }
+
+    void ReadDiv(uint8_t &ldm) {
+        ldm = linkedFreqDivider;
     }
 };
 
