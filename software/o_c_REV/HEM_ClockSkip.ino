@@ -37,7 +37,7 @@ public:
         ForEachChannel(ch)
         {
             if (Clock(ch)) {
-                int prob = p[ch] + Proportion(DetentedIn(ch), HEMISPHERE_MAX_CV, 100);
+                int prob = p[ch] + Proportion(DetentedIn(ch), HEMISPHERE_MAX_INPUT_CV, 100);
                 if (random(1, 100) <= prob) {
                     ClockOut(ch);
                     trigger_countdown[ch] = 1667;
@@ -49,17 +49,20 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawSelector();
         DrawIndicator();
     }
 
     void OnButtonPress() {
-        cursor = 1 - cursor;
+        CursorAction(cursor, 1);
     }
 
     void OnEncoderMove(int direction) {
-        p[cursor] = constrain(p[cursor] += direction, 0, 100);
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 1);
+            return;
+        }
+        p[cursor] = constrain(p[cursor] + direction, 0, 100);
     }
         
     uint64_t OnDataRequest() {
@@ -85,7 +88,7 @@ protected:
 private:
     int16_t p[2];
     int trigger_countdown[2];
-    uint8_t cursor;
+    int cursor;
     
     void DrawSelector()
     {

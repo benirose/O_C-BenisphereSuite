@@ -1158,6 +1158,7 @@ private:
 //     The first 32 song steps @ 4 bytes each = 128 bytes
 //     Four track settings @ 1 byte each      =   4 bytes
 //     Song length                            =   1 byte
+// TOTAL EEPROM SIZE: 150 bytes
 #define ENIGMA_EEPROM_DATA {0,0,255,"St",NULL,settings::STORAGE_TYPE_U8},
 #define ENIGMA_DO_THIRTY_TIMES(A) A A A A A A A A A A A A A A A A A A A A A A A A A A A A A A
 SETTINGS_DECLARE(EnigmaTMWS, ENIGMA_SETTING_LAST) {
@@ -1175,7 +1176,7 @@ void EnigmaTMWS_init() {
     EnigmaTMWS_instance.BaseStart();
 }
 
-size_t EnigmaTMWS_storageSize() {
+constexpr size_t EnigmaTMWS_storageSize() {
     return EnigmaTMWS::storageSize();
 }
 size_t EnigmaTMWS_save(void *storage) {
@@ -1211,14 +1212,14 @@ void EnigmaTMWS_handleButtonEvent(const UI::Event &event) {
     // For left encoder, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_L) {
         if (event.type == UI::EVENT_BUTTON_LONG_PRESS) EnigmaTMWS_instance.OnLeftButtonLongPress();
-        else EnigmaTMWS_instance.OnLeftButtonPress();
+        if (event.type == UI::EVENT_BUTTON_PRESS) EnigmaTMWS_instance.OnLeftButtonPress();
     }
 
     // For right encoder, only handle press (long press is reserved)
     if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) EnigmaTMWS_instance.OnRightButtonPress();
 
     // For up button, handle only press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_UP) EnigmaTMWS_instance.OnUpButtonPress();
+    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS) EnigmaTMWS_instance.OnUpButtonPress();
 
     // For down button, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_DOWN) {

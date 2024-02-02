@@ -1,45 +1,60 @@
-Benisphere Suite is Retired!
+[![PlatformIO CI](https://github.com/djphazer/O_C-BenisphereSuite/actions/workflows/firmware.yml/badge.svg)](https://github.com/djphazer/O_C-BenisphereSuite/actions/workflows/firmware.yml)
+
+Phazerville Suite - an active o_C firmware fork
 ===
+[![SynthDad's video overview](http://img.youtube.com/vi/XRGlAmz3AKM/0.jpg)](http://www.youtube.com/watch?v=XRGlAmz3AKM "Phazerville; newest firmware for Ornament and Crime. Tutorial and patch ideas")
 
-I’m sorry to say that I have stopped working on this firmware. If you want the latest and greatest of what the o_C has to offer, I recommend checking out the [Phazerville fork](https://github.com/djphazer/O_C-BenisphereSuite). It includes all of the work I put into Benispheres and then some! 
+Watch SynthDad's **video overview** (above) or check the [**Wiki**](https://github.com/djphazer/O_C-BenisphereSuite/wiki) for more info.
 
-I have extreme gratitude for everyone’s support and enthusiasm over the years, it has meant a lot to me. Contributing to a meaningful open source project has been a goal of mine since I started my career as a developer. Thank you for giving me an opportunity to achieve that dream! I’m sure I will work on modular projects again in the future, feel free to follow me on instagram [@benirosemusic](https://www.instagram.com/benirosemusic/) or my [YouTube channel](https://www.youtube.com/c/benirosemusic) to stay updated on all of my projects and music, and don’t be afraid to reach out! It has been a true blessing to be a part of this community.
+[Download a **Release**](https://github.com/djphazer/O_C-BenisphereSuite/releases) or [Request a **Custom Build**](https://github.com/djphazer/O_C-Phazerville/discussions/38).
 
-## A (previously) active fork expanding upon Hemisphere Suite.
+## Stolen Ornaments
 
-To download and install the latest release, head to [releases](https://github.com/benirose/O_C-BenisphereSuite/releases).
+Using [**Benisphere**](https://github.com/benirose/O_C-BenisphereSuite) as a starting point, this branch takes the **Hemisphere Suite** in new directions, with several new applets and enhancements to existing ones. I wanted to collect all the bleeding-edge features from other clever developers, with the goal of cramming as much functionality and flexibility into the nifty dual-applet design as possible!
 
-To learn more about what makes this fork different than the original Hemisphere Suite, head to [the wiki](https://github.com/benirose/O_C-BenisphereSuite/wiki).
+I've also included **all of the stock O&C firmware apps** plus a few others, but they don't all fit in one .hex. As a courtesy, I provide **pre-built .hex files** with various combinations of Apps in my [**Releases**](https://github.com/djphazer/O_C-BenisphereSuite/releases). You can also tell a robot to make a [**Custom Build**](https://github.com/djphazer/O_C-Phazerville/discussions/38) for you...
 
-Benisphere takes the Hemisphere Suite in a new direction, adding new applets and some enhancements to existing ones, while also removing o_C style apps to make space for these changes.
+...or clone the repo, customize the `platformio.ini` file, and build it yourself! ;-)
+I think the beauty of this module is the fact that it's relatively easy to modify and build the source code to reprogram it. You are free to customize the firmware, similar to how you've no doubt already selected a custom set of physical modules.
 
-### An alternate firmware to an alternate firmware??
+### New Crimes
 
-Yes! This fork was an opportunity for me add stuff I wanted to see on my o_C without having to worry about running up against any legacy issues for other Hemipshere users. When I shared some of the progress I was making in my fork, people seemed excited and interested in trying it out, so I have made it an official fork rather than just my own personal project. I try to give back any improvements I make to the [main Hemispheres repo](https://github.com/Chysn/O_C-HemisphereSuite) when possible, but 1) it is not clear if that repo is still active and 2) there is barely any room remaining on the Teensy for improvements. By deciding that this version of the suite will only contain Hemisphere applets I was able to make room for new applets and other improvements. I do accept feature request issues and pull request, but the things that will make it in to this fork are still largely up to my discression.
+* 4 Presets in the new [**Hemisphere Config**](https://github.com/djphazer/O_C-BenisphereSuite/wiki/Hemisphere-Config)
+* Modal-editing style cursor navigation (and other usability tweaks)
+* Expanded internal [**Clock Setup**](https://github.com/djphazer/O_C-BenisphereSuite/wiki/Clock-Setup)
+* New Apps: [**Scenes**](https://github.com/djphazer/O_C-BenisphereSuite/wiki/Scenes) and [**Calibr8or**](https://github.com/djphazer/O_C-BenisphereSuite/wiki/Calibr8or)
+* **[DualTM](https://github.com/djphazer/O_C-BenisphereSuite/wiki/DualTM)** - two 32-bit shift registers. Assignable I/O.
+* **[EbbAndLfo](https://github.com/djphazer/O_C-BenisphereSuite/wiki/Ebb-&-LFO)** (via [qiemem](https://github.com/qiemem/O_C-HemisphereSuite/tree/trig-and-tides)) - mini implementation of MI Tides, with v/oct tracking
+* **[EuclidX](https://github.com/djphazer/O_C-BenisphereSuite/wiki/EuclidX)** - AnnularFusion got a makeover, now includes padding, configurable CV input modulation - (credit to [qiemem](https://github.com/qiemem/O_C-HemisphereSuite/tree/expanded-clock-div) and [adegani](https://github.com/adegani/O_C-HemisphereSuite))
+* LoFi Tape has been transformed into **LoFi Echo** - a crazy bitcrushing digital delay line - (credit to [armandvedel](https://github.com/armandvedel/O_C-HemisphereSuite_log) for the initial idea)
+* Sequence5 -> **SequenceX** (8 steps max) (from [logarhythm](https://github.com/Logarhythm1/O_C-HemisphereSuite))
 
-### Ok, so what's changed?
+Plus lots of other small tweaks + experimental applets.
 
-As of v1.0, I have added two new applets inspired by very popular modules ([Mutable Instruments Grids](https://mutable-instruments.net/modules/grids/) and [Noise Engineering Mimetic Digitalis](https://noiseengineering.us/products/mimetic-digitalis)) as well as some minor improvements to existing apps. I've also removed all of the full-width o_C style apps to make space for these changes. To see all of the changes in detail, visit the [wiki](https://github.com/benirose/O_C-BenisphereSuite/wiki).
+### How To Hack It
 
-### How do I try it?
+This firmware fork is built using Platform IO, a Python-based build toolchain, available as either a [standalone CLI](https://docs.platformio.org/en/latest/core/installation/methods/installer-script.html) or a [full-featured IDE](https://platformio.org/install/ide), as well as a plugin for VSCode and other existing IDEs.
 
-Head over to the [releases](https://github.com/benirose/O_C-BenisphereSuite/releases) section and download the latest release. Follow the ["Method A" instructions](https://ornament-and-cri.me/firmware/#method_a) from the Ornament and Crime website, except use the hex file you downloaded from the releases section.
+The project lives within the `software/o_c_REV` directory. From there, you can Build the desired configuration and Upload via USB to your module:
+```
+pio run -e oc_stock2_flipped -t upload
+```
+Have a look inside `platformio.ini` for alternative build environment configurations - VOR, Buchla, flipped screen, etc. To build all the defaults consecutively, simply use `pio run`
 
-Alternatively, you can follow instructions in [this video](https://www.youtube.com/watch?v=dg_acylaMZU).
+_**Pro-tip**_: If you decide to fork the project, and enable GitHub Actions on your own repo, GitHub will build the files for you... ;)
 
-Note: you can reload any other previous firmware you had installed (stock o_C or Hemisphere Suite) just as easily.
+## Credits
 
-### How do I build it?
+Many minds before me have made this project possible. Attribution is present in the git commit log and within individual files.
+Shoutouts:
+* **[Logarhythm1](https://github.com/Logarhythm1)** for the incredible **TB-3PO** sequencer, as well as **Stairs**.
+* **[herrkami](https://github.com/herrkami)** and **Ben Rosenbach** for their work on **BugCrack**.
+* **[benirose](https://github.com/benirose)** also gets massive props for **DrumMap**, **Shredder** and the **ProbDiv / ProbMelo** applets.
+* **[qiemem](https://github.com/qiemem)** (Bryan Head) for the **Ebb&LFO** applet and its _tideslite_ backend, among other things.
 
-You can download this repo and build the code following the ["Method B" instruction](https://ornament-and-cri.me/firmware/#method_b) from the Ornament and Crime website. Very specific legacy versions of the Arduino IDE and Teensyduino add-on are required to build, and are not installable on 64-bit only systems, like Mac OS. You must use an older version (Mojave or before) or a VM to install these versions.
+And, of course, thank you to **[Chysn](https://github.com/Chysn)** for the clever applet framework from which we've all drawn inspiration.
 
-### What's with the name?
-
-Beta tester [@jroo](https://github.com/jroo) jokingly called it that, and it kind of stuck! It's supposed to be a bit tongue in cheek, so I hope it's not taken too seriously! Also it has a nicer ringer than "Hemisphere Suite BR Fork".
-
-### Credits
-
-This is a fork of [Hemisphere Suite](https://github.com/Chysn/O_C-HemisphereSuite) by Jason Justian (aka chysn). I could not have built Hemisphere Suite, so a million thanks to Jason for doing the true hard work and keeping it open source.
+This is a fork of [Benisphere Suite](https://github.com/benirose/O_C-BenisphereSuite) which is a fork of [Hemisphere Suite](https://github.com/Chysn/O_C-HemisphereSuite) by Jason Justian (aka chysn).
 
 ornament**s** & crime**s** is a collaborative project by Patrick Dowling (aka pld), mxmxmx and Tim Churches (aka bennelong.bicyclist) (though mostly by pld and bennelong.bicyclist). it **(considerably) extends** the original firmware for the o_C / ASR eurorack module, designed by mxmxmx.
 

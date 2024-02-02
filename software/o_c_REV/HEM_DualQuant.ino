@@ -35,9 +35,8 @@ public:
         cursor = 0;
         ForEachChannel(ch)
         {
-            quantizer[ch].Init();
             scale[ch] = ch + 5;
-            quantizer[ch].Configure(OC::Scales::GetScale(scale[ch]), 0xffff);
+            QuantizerConfigure(ch, scale[ch]);
             last_note[ch] = 0;
             continuous[ch] = 1;
         }
@@ -53,7 +52,7 @@ public:
 
             if (continuous[ch] || EndOfADCLag(ch)) {
                 int32_t pitch = In(ch);
-                int32_t quantized = quantizer[ch].Process(pitch, root[ch] << 7, 0);
+                int32_t quantized = Quantize(ch, pitch, root[ch] << 7, 0);
                 Out(ch, quantized);
                 last_note[ch] = quantized;
             }
@@ -61,23 +60,26 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawSelector();
     }
 
     void OnButtonPress() {
-        if (++cursor > 3) cursor = 0;
-        ResetCursor();
+        CursorAction(cursor, 3);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 3);
+            return;
+        }
+
         uint8_t ch = cursor / 2;
         if (cursor == 0 || cursor == 2) {
             // Scale selection
             scale[ch] += direction;
             if (scale[ch] >= OC::Scales::NUM_SCALES) scale[ch] = 0;
             if (scale[ch] < 0) scale[ch] = OC::Scales::NUM_SCALES - 1;
-            quantizer[ch].Configure(OC::Scales::GetScale(scale[ch]), 0xffff);
+            QuantizerConfigure(ch, scale[ch]);
             continuous[ch] = 1; // Re-enable continuous mode when scale is changed
         } else {
             // Root selection
@@ -103,7 +105,7 @@ public:
         ForEachChannel(ch)
         {
             root[0] = constrain(root[0], 0, 11);
-            quantizer[ch].Configure(OC::Scales::GetScale(scale[ch]), 0xffff);
+            QuantizerConfigure(ch, scale[ch]);
         }
     }
 
@@ -117,7 +119,6 @@ protected:
     }
     
 private:
-    braids::Quantizer quantizer[2];
     int last_note[2]; // Last quantized note
     bool continuous[2]; // Each channel starts as continuous and becomes clocked when a clock is received
     int cursor;
@@ -128,8 +129,7 @@ private:
 
     void DrawSelector()
     {
-        const uint8_t notes[2][8] = {{0xc0, 0xe0, 0xe0, 0xe0, 0x7f, 0x02, 0x14, 0x08},
-                                     {0xc0, 0xa0, 0xa0, 0xa0, 0x7f, 0x00, 0x00, 0x00}};
+        const uint8_t * notes[2] = {NOTE_ICON, NOTE2_ICON};
 
         ForEachChannel(ch)
         {
@@ -139,10 +139,9 @@ private:
             gfxPrint(10 + (31 * ch), 25, OC::Strings::note_names_unpadded[root[ch]]);
 
             // Draw cursor
-            int cursor_ch = cursor / 2;
-            if (ch == cursor_ch) {
-                if (cursor == 0 || cursor == 2) gfxCursor(0 + (31 * ch), 23, 30);
-                else gfxCursor(10 + (31 * ch), 33, 12);
+            int y = cursor % 2; // 0=top line, 1=bottom
+            if (ch == (cursor / 2)) {
+                gfxCursor(y*10 + ch*31, 23 + y*10, 12+(1-y)*18);
             }
 
             // Little note display

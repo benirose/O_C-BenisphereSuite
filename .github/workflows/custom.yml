@@ -1,0 +1,69 @@
+name: Custom Build
+
+on:
+  discussion_comment:
+    types: [created]
+
+jobs:
+  build:
+    name: Build Custom Firmware
+    if: contains(github.event.comment.body, '/buildthis')
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: phazerville
+
+    - name: Setup env
+      env:
+        GH_COMMENT: ${{ github.event.comment.body }}
+      run: |
+        echo "OC_ARTIFACT_TAG=custom_${GITHUB_ACTOR}-$(software/o_c_REV/resources/oc_build_tag.sh)" | tr '/' '_' >> $GITHUB_ENV
+        echo "CUSTOM_BUILD_FLAGS=$(python software/o_c_REV/resources/parse_build_request.py)" >> $GITHUB_ENV
+
+    - name: Cache PlatformIO
+      uses: actions/cache@v3
+      with:
+        path: ~/.platformio
+        key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.x'
+        cache: 'pip'
+        cache-dependency-path: '**/requirements.txt'
+
+    - run: |
+        pip3 install --upgrade pip
+        pip3 install -r .github/workflows/requirements.txt
+
+    - name: Build firmware
+      working-directory: software/o_c_REV/
+      run: |
+        pio run -e custom
+
+    - name: Copy artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: o_C-${{env.OC_ARTIFACT_TAG}}
+        path: software/o_c_REV/.pio/build/*/*.hex
+
+# TODO: this will only work with Issues or Pull Requests...
+#    - name: Add follow-up comment to discussion
+#      uses: actions/github-script@v6
+#      if: always()
+#      with:
+#        script: |
+#          const name = '${{ github.workflow   }}';
+#          const url = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+#          const success = '${{ job.status }}' === 'success';
+#          const body = `${name}: ${success ? 'succeeded ✅' : 'failed ❌'}\n${url}`;
+#
+#          await github.rest.issues.createComment({
+#            issue_number: context.issue.number,
+#            owner: context.repo.owner,
+#            repo: context.repo.repo,
+#            body: body
+#          })

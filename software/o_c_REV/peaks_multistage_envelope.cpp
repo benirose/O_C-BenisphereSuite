@@ -135,11 +135,7 @@ uint16_t MultistageEnvelope::ProcessSingleSample(uint8_t control) {
   } else {
     scaled_value_ = (value_ * amplitude_) >> 16;
   }
-  #ifdef BUCHLA_4U
-    return(static_cast<uint16_t>(scaled_value_ << 1));
-  #else
-    return(static_cast<uint16_t>(scaled_value_));
-  #endif
+  return(static_cast<uint16_t>(scaled_value_));
 }
 
 uint16_t MultistageEnvelope::RenderPreview(

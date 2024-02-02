@@ -80,21 +80,31 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawControls();
         DrawSequence();
     }
 
     void OnButtonPress() {
-        cursor++;
-        if (cursor > 2) cursor = 0;
-        ResetCursor();
+        CursorAction(cursor, 2);
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 0) compose = constrain(compose += direction, 0, HEM_PALIMPSEST_MAX_VALUE);
-        if (cursor == 1) decompose = constrain(decompose -= direction, 0, HEM_PALIMPSEST_MAX_VALUE);
-        if (cursor == 2) length = constrain(length += direction, 2, 16);
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 2);
+            return;
+        }
+
+        switch (cursor) {
+        case 0:
+            compose = constrain(compose + direction, 0, HEM_PALIMPSEST_MAX_VALUE);
+            break;
+        case 1:
+            decompose = constrain(decompose - direction, 0, HEM_PALIMPSEST_MAX_VALUE);
+            break;
+        case 2:
+            length = constrain(length + direction, 2, 16);
+            break;
+        }
         ResetCursor();
     }
         

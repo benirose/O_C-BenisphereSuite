@@ -51,20 +51,23 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawInterface();
     }
 
     void OnButtonPress() {
-        if (++cursor > 3) cursor = 0;
-        ResetCursor();
+        CursorAction(cursor, 3);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 3);
+            return;
+        }
+
         uint8_t ch = cursor / 2;
         if (cursor == 0 || cursor == 2) {
             // Change voltage
-            int min = -HEMISPHERE_3V_CV / VOLTAGE_INCREMENTS;
+            int min = -HEMISPHERE_MAX_CV / VOLTAGE_INCREMENTS;
             int max = HEMISPHERE_MAX_CV / VOLTAGE_INCREMENTS;
             voltage[ch] = constrain(voltage[ch] + direction, min, max);
         } else {
@@ -117,9 +120,7 @@ private:
             if (view[ch]) gfxInvert(0, 14 + (ch * 20), 7, 9);
         }
 
-        int ch = cursor / 2;
-        if (cursor == 0 or cursor == 2) gfxCursor(13, 23 + (ch * 20), 36);
-        else gfxCursor(13, 33 + (ch * 20), 36);
+        gfxCursor(12, 23 + cursor * 10, 37);
     }
 
 };

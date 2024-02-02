@@ -39,8 +39,8 @@ public:
 
     void Controller() {
         if (!Gate(1)) { // Freeze if gated
-            int freq_cv = Proportion(In(0), HEMISPHERE_MAX_CV, 63);
-            int rho_cv = Proportion(In(1), HEMISPHERE_MAX_CV, 31);
+            int freq_cv = Proportion(In(0), HEMISPHERE_MAX_INPUT_CV, 63);
+            int rho_cv = Proportion(In(1), HEMISPHERE_MAX_INPUT_CV, 31);
 
             int32_t freq_h = SCALE8_16(constrain(freq + freq_cv, 0, 255));
             freq_h = USAT16(freq_h);
@@ -62,18 +62,22 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawEditor();
         DrawOutput();
     }
 
     void OnButtonPress() {
-        cursor = 1 - cursor;
+        CursorAction(cursor, 1);
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 0) freq = constrain(freq += direction, 0, 255);
-        if (cursor == 1) rho = constrain(rho += direction, 4, 127);
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 1);
+            return;
+        }
+
+        if (cursor == 0) freq = constrain(freq + direction, 0, 255);
+        if (cursor == 1) rho = constrain(rho + direction, 4, 127);
     }
 
     uint64_t OnDataRequest() {

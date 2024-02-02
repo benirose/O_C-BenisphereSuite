@@ -27,6 +27,14 @@
 class Carpeggio : public HemisphereApplet {
 public:
 
+    enum CarpeggioCursor {
+        CHORD,
+        TRANSPOSE,
+        SHUFFLE,
+        NOTE_EDIT,
+        LAST_SETTING = NOTE_EDIT
+    };
+
     const char* applet_name() {
         return "Carpeggio";
     }
@@ -73,7 +81,7 @@ public:
         }
 
         // Modulation output
-        int xy = (In(0) * In(1)) / HEMISPHERE_MAX_CV;
+        int xy = (In(0) * In(1)) / HEMISPHERE_MAX_INPUT_CV;
         Out(1, xy);
 
         // Handle imprint confirmation animation
@@ -84,34 +92,51 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawSelector();
         DrawGrid();
     }
 
     void OnButtonPress() {
+        if (cursor == SHUFFLE && !EditMode()) // special case toggle
+            shuffle ? ImprintChord(sel_chord) : ShuffleChord();
+        else // Advance or toggle cursor
+            CursorAction(cursor, LAST_SETTING);
+
         // Set a chord imprint if a new chord is picked
-        if (cursor == 1 && chord != sel_chord) {
-            cursor = 0; // Don't advance cursor when chord is changed
+        if (chord != sel_chord) {
             ImprintChord(chord);
+            cursor = CHORD; // keep cursor on chord selection
         }
-        if (++cursor > 3) cursor = 0;
-        ResetCursor();
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 0) sequence[step] = constrain(sequence[step] += direction, -24, 60);
-        if (cursor == 1) chord = constrain(chord += direction, 0, Nr_of_arp_chords - 1);
-        if (cursor == 2) transpose = constrain(transpose += direction, -24, 24);
-        if (cursor == 3) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, LAST_SETTING);
+            return;
+        }
+
+        switch ((CarpeggioCursor)cursor) {
+        case NOTE_EDIT:
+            sequence[step] = constrain(sequence[step] + direction, -24, 60);
+            break;
+        case CHORD:
+            chord = constrain(chord + direction, 0, Nr_of_arp_chords - 1);
+            break;
+        case TRANSPOSE:
+            transpose = constrain(transpose + direction, -24, 24);
+            break;
+
+        case SHUFFLE:
             if (shuffle && direction < 0) {
                 ImprintChord(sel_chord);
             }
             if (direction > 0) {
                 ShuffleChord();
             }
+            break;
         }
-        if (cursor != 1) replay = 1;
+
+        if (cursor != CHORD) replay = 1;
     }
         
     uint64_t OnDataRequest() {
@@ -137,7 +162,7 @@ protected:
     }
     
 private:
-    int cursor; // 0=notes, 1=chord
+    int cursor; // CarpeggioCursor
 
     // Sequencer state
     uint8_t step; // Current step number
@@ -158,7 +183,7 @@ private:
     void DrawSelector() {
         // Chord selector
         gfxPrint(0, 15, Arp_Chords[chord].chord_name);
-        if (cursor == 1) {
+        if (cursor == CHORD) {
             gfxCursor(1, 23, 53);
             gfxBitmap(55, 14, 8, chord == sel_chord ? CHECK_ON_ICON : CHECK_OFF_ICON);
         }
@@ -167,18 +192,18 @@ private:
         gfxPrint(32, 25, "Tr");
         gfxPrint(transpose < 0 ? "" : "+");
         gfxPrint(transpose);
-        if (cursor == 2) gfxCursor(32, 33, 30);
+        if (cursor == TRANSPOSE) gfxCursor(32, 33, 30);
 
         // Shuffle selector
         gfxBitmap(37, 36, 8, PLAY_ICON);
         gfxBitmap(49, 36, 8, LOOP_ICON);
         gfxInvert(36 + (shuffle ? 12 : 0), 35, 10, 10);
-        if (cursor == 3) gfxCursor(37, 46, 20);
+        if (cursor == SHUFFLE) gfxCursor(36, 46, 22, 11);
 
         // Note name editor
         uint8_t midi_note = constrain(sequence[step] + 36 + transpose, 0, 127);
         gfxPrint(38, 50, midi_note_numbers[midi_note]);
-        if (cursor == 0) gfxCursor(32, 58, 30);
+        if (cursor == NOTE_EDIT) gfxCursor(32, 58, 30);
     }
 
     void DrawGrid() {

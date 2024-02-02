@@ -1,4 +1,2 @@
-#ifndef OC_VERSION_H_
-#define OC_VERSION_H_
-#define OC_VERSION "v1.3.1"
-#endif
+// NOTE: DO NOT INCLUDE DIRECTLY, USE OC::Strings::VERSION
+"v1.6.999"

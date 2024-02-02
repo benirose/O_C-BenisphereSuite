@@ -32,13 +32,19 @@
 
 // Teensyduino USB MIDI Library message numbers
 // See https://www.pjrc.com/teensy/td_midi.html
-const uint8_t MIDI_MSG_NOTE_ON = 1;
-const uint8_t MIDI_MSG_NOTE_OFF = 0;
-const uint8_t MIDI_MSG_MIDI_CC = 3;
-const uint8_t MIDI_MSG_AFTERTOUCH = 5;
-const uint8_t MIDI_MSG_PITCHBEND = 6;
-const uint8_t MIDI_MSG_SYSEX = 7;
-const uint8_t MIDI_MSG_REALTIME = 8;
+
+#define HEM_MIDI_NOTE_ON usbMIDI.NoteOn
+#define HEM_MIDI_NOTE_OFF usbMIDI.NoteOff
+#define HEM_MIDI_CC usbMIDI.ControlChange
+#define HEM_MIDI_AFTERTOUCH usbMIDI.AfterTouchChannel
+#define HEM_MIDI_PITCHBEND usbMIDI.PitchBend
+#define HEM_MIDI_SYSEX usbMIDI.SystemExclusive
+
+#define HEM_MIDI_CLOCK usbMIDI.Clock
+#define HEM_MIDI_START usbMIDI.Start
+#define HEM_MIDI_STOP usbMIDI.Stop
+
+#define HEM_MIDI_CLOCK_DIVISOR 12
 
 const char* const midi_note_numbers[128] = {
     "C-1","C#-1","D-1","D#-1","E-1","F-1","F#-1","G-1","G#-1","A-1","A#-1","B-1",
@@ -58,6 +64,23 @@ const char* const midi_channels[17] = {
     "Off", " 1", " 2", " 3", " 4", " 5", " 6", " 7", " 8",
     " 9", "10", "11", "12", "13", "14", "15", "16"
 };
+
+// The functions available for each output
+enum MIDIFunctions {
+    HEM_MIDI_NOOP = 0,
+    HEM_MIDI_NOTE_OUT,
+    HEM_MIDI_TRIG_OUT,
+    HEM_MIDI_GATE_OUT,
+    HEM_MIDI_VEL_OUT,
+    HEM_MIDI_CC_OUT,
+    HEM_MIDI_AT_OUT,
+    HEM_MIDI_PB_OUT,
+    HEM_MIDI_CLOCK_OUT,
+    HEM_MIDI_START_OUT,
+
+    HEM_MIDI_MAX_FUNCTION = HEM_MIDI_START_OUT
+};
+const char* const midi_fn_name[HEM_MIDI_MAX_FUNCTION + 1] = {"None", "Note#", "Trig", "Gate", "Veloc", "CC#", "Aft", "Bend", "Clock", "Start"};
 
 
 /* Hemisphere Suite Data Packing
@@ -228,7 +251,7 @@ protected:
     bool ListenForSysEx() {
         bool heard_sysex = 0;
         if (usbMIDI.read()) {
-            if (usbMIDI.getType() == 7) {
+            if (usbMIDI.getType() == usbMIDI.SystemExclusive) {
                 OnReceiveSysEx();
                 heard_sysex = 1;
             }

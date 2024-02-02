@@ -48,7 +48,6 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         gfxPrint(1, 15, "Thr:");
         gfxPrintVoltage(threshold);
         gfxSkyline();

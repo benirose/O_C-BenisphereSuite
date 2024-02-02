@@ -41,9 +41,11 @@ namespace tonnetz {
     '*', 'P', 'L', 'R', 'N', 'S', 'H', '@'
   };
 
+
   static const char *transform_names_str[TRANSFORM_LAST + 1] = {
     "*", "P", "L", "R", "N", "S", "H", "@"
   };
+
 
   static struct transformation {
     size_t root_shift; // +1 = root -> third, +2 root -> fifth

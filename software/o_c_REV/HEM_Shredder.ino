@@ -39,9 +39,8 @@ public:
         replay = 0;
         reset = true;
         quant_channels = 0;
-        quantizer.Init();
         scale = OC::Scales::SCALE_NONE;
-        quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+        QuantizerConfigure(0, scale);
         ForEachChannel(ch) {
             Shred(ch);
         }
@@ -91,16 +90,19 @@ public:
             // decrement delay and if it's 0, move the cursor
             if (--double_click_delay < 1) {
                 // if we hit zero before being reset (aka no double click), move the cursor
-                if (++cursor > 3) cursor = 0; // we should never be > 3, so this is just for safety
+                CursorButton();
             }
         }
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawParams();
         DrawMeters();
         DrawGrid();
+    }
+
+    void CursorButton() {
+        CursorAction(cursor, 3);
     }
 
     void OnButtonPress() {
@@ -115,11 +117,16 @@ public:
                 Shred(cursor);
             }
         } else {
-            if (++cursor > 3) cursor = 0;
+            CursorButton();
         }
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 3);
+            return;
+        }
+
         if (cursor < 2) {
             range[cursor] += direction;
             if (bipolar[cursor]) {
@@ -140,12 +147,12 @@ public:
                 }
             }
         }
-        if (cursor == 2) quant_channels = constrain(quant_channels += direction, 0, 2);
+        if (cursor == 2) quant_channels = constrain(quant_channels + direction, 0, 2);
         if (cursor == 3) {
           scale += direction;
           if (scale >= OC::Scales::NUM_SCALES) scale = 0;
           if (scale < 0) scale = OC::Scales::NUM_SCALES - 1;
-          quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+          QuantizerConfigure(0, scale);
         }
     }
         
@@ -168,7 +175,7 @@ public:
         bipolar[1] = Unpack(data, PackLocation {12,1}); 
         quant_channels = Unpack(data, PackLocation {16,8});
         scale = Unpack(data, PackLocation {24,8});
-        quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+        QuantizerConfigure(0, scale);
         ForEachChannel(ch) {
             Shred(ch);
         }
@@ -200,7 +207,6 @@ private:
     bool bipolar[2] = {false, false};
     int8_t quant_channels;
     int scale;
-    braids::Quantizer quantizer;
 
     // Variables to handle imprint confirmation animation
     int confirm_animation_countdown;
@@ -300,7 +306,7 @@ private:
         ForEachChannel(ch) {
             current[ch] = sequence[ch][step];
             int8_t qc = quant_channels - 1; 
-            if (qc < 0 || qc == ch) current[ch] = quantizer.Process(current[ch], 0, 0);
+            if (qc < 0 || qc == ch) current[ch] = Quantize(0, current[ch], 0, 0);
             Out(ch, current[ch]);
         }
     }

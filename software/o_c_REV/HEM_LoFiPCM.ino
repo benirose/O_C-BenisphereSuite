@@ -19,150 +19,170 @@
 // SOFTWARE.
 
 #define HEM_LOFI_PCM_BUFFER_SIZE 2048
-#define HEM_LOFI_PCM_SPEED 8
-#define LOFI_PCM2CV(S) ((uint32_t)S << 8) - 32767;
+#define HEM_LOFI_PCM_SPEED 4
+
+// #define CLIPLIMIT 32512
+#define CLIPLIMIT HEMISPHERE_3V_CV
+
+#define PCM_TO_CV(S) Proportion((int)S - 127, 127, CLIPLIMIT)
+#define CV_TO_PCM(S) Proportion(constrain(S, -CLIPLIMIT, CLIPLIMIT), CLIPLIMIT, 127) + 127
+
+uint8_t lofi_pcm_buffer[HEM_LOFI_PCM_BUFFER_SIZE];
 
 class LoFiPCM : public HemisphereApplet {
 public:
+    const int length = HEM_LOFI_PCM_BUFFER_SIZE;
 
     const char* applet_name() { // Maximum 10 characters
-        return "LoFi Tape";
+        return "LoFi Echo";
     }
 
     void Start() {
         countdown = HEM_LOFI_PCM_SPEED;
-        for (int i = 0; i < HEM_LOFI_PCM_BUFFER_SIZE; i++) pcm[i] = 127;
+        // this might take too long, which causes crashes. It's not crucial.
+        //for (int i = 0; i < HEM_LOFI_PCM_BUFFER_SIZE; i++) lofi_pcm_buffer[i] = 127;
+        cursor = 1; //for gui
     }
 
     void Controller() {
         play = !Gate(0); // Continuously play unless gated
-        gated_record = Gate(1);
+        fdbk_g = Gate(1) ? 100 : feedback; // Feedback = 100 when gated
 
-        countdown--;
-        if (countdown == 0) {
-            if (play || record || gated_record) head++;
-            if (head >= length) {
-                head = 0;
-                record = 0;
-                ClockOut(1);
+        if (play) {
+            if (--countdown == 0) {
+                if (++head >= length) {
+                    head = 0;
+                    //ClockOut(1);
+                }
+
+                int cv = SmoothedIn(0);
+
+                // bitcrush the input
+                cv = cv >> depth;
+                cv = cv << depth;
+
+                // int dt = dt_pct * length / 100; //convert delaytime to length in samples 
+                head_w = (head + length + dt_pct*length/100) % length; //have to add the extra length to keep modulo positive in case delaytime is neg
+
+                // mix input into the buffer ahead, respecting feedback
+                int fbmix = PCM_TO_CV(lofi_pcm_buffer[head]) * fdbk_g / 100 + cv;
+                lofi_pcm_buffer[head_w] = CV_TO_PCM(fbmix);
+                
+                rate_mod = rate;
+                Modulate(rate_mod, 1, 1, 64);
+
+                countdown = rate_mod;
             }
 
-            if (record || gated_record) {
-                uint32_t s = (In(0) + 32767) >> 8;
-                pcm[head] = (char)s;
-            }
-
-            uint32_t s = LOFI_PCM2CV(pcm[head]);
-            int SOS = In(1); // Sound-on-sound
-            int live = Proportion(SOS, HEMISPHERE_MAX_CV, In(0));
-            int loop = play ? Proportion(HEMISPHERE_MAX_CV - SOS, HEMISPHERE_MAX_CV, s) : 0;
-            Out(0, live + loop);
-            countdown = HEM_LOFI_PCM_SPEED;
+            SmoothedOut(0, PCM_TO_CV(lofi_pcm_buffer[head]), (rate_mod+1)/2);
+            SmoothedOut(1, PCM_TO_CV(lofi_pcm_buffer[length-1 - head]), (rate_mod+1)/2); // reverse buffer!
         }
     }
 
     void View() {
-        gfxHeader(applet_name());
-        DrawTransportBar();
-        DrawWaveform();
+        DrawSelector();
+        if (play) DrawWaveform();
     }
 
     void OnButtonPress() {
-        record = 1 - record;
-        play = 0;
-        head = 0;
+        CursorAction(cursor, 3);
     }
 
     void OnEncoderMove(int direction) {
-        length = constrain(length += (direction * 32), 32, HEM_LOFI_PCM_BUFFER_SIZE);
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 3);
+            return;
+        }
+
+        switch (cursor) {
+        case 0:
+            dt_pct = constrain(dt_pct + direction, 0, 99);
+            break;
+        case 1:
+            feedback = constrain(feedback + direction, 0, 125);
+            break;
+        case 2:
+            rate = constrain(rate + direction, 1, 32);
+            break;
+        case 3:
+            depth = constrain(depth + direction, 0, 13);
+            break;
+        }
     }
 
     uint64_t OnDataRequest() {
         uint64_t data = 0;
+        Pack(data, PackLocation {0,7}, dt_pct);
+        Pack(data, PackLocation {7,7}, feedback);
+        Pack(data, PackLocation {14,5}, rate);
+        Pack(data, PackLocation {19,4}, depth);
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
+        dt_pct = Unpack(data, PackLocation {0,7});
+        feedback = Unpack(data, PackLocation {7,7});
+        rate = Unpack(data, PackLocation {14,5});
+        depth = Unpack(data, PackLocation {19,4});
     }
 
 protected:
     void SetHelp() {
         //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "Gate 1=Pause 2=Rec";
-        help[HEMISPHERE_HELP_CVS]      = "1=Audio 2=SOS";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Audio B=EOC Trg";
-        help[HEMISPHERE_HELP_ENCODER]  = "T=End Pt P=Rec";
+        help[HEMISPHERE_HELP_DIGITALS] = "1=Pause 2= Fb=100";
+        help[HEMISPHERE_HELP_CVS]      = "1=Audio 2=RateMod";
+        help[HEMISPHERE_HELP_OUTS]     = "A=Audio B=Reverse";
+        help[HEMISPHERE_HELP_ENCODER]  = "Time/Fbk/Rate/Bits";
         //                               "------------------" <-- Size Guide
     }
     
 private:
-    char pcm[HEM_LOFI_PCM_BUFFER_SIZE];
-    bool record = 0; // Record activated via button
-    bool gated_record = 0; // Record gated via digital in
-    bool play = 0;
-    int head = 0; // Locatioon of play/record head
-    int countdown = HEM_LOFI_PCM_SPEED;
-    int length = HEM_LOFI_PCM_BUFFER_SIZE;
-    
-    void DrawTransportBar() {
-        DrawStop(3, 15);
-        DrawPlay(26, 15);
-        DrawRecord(50, 15);
-    }
+    bool play = 0; //play always on unless gated on Digital 1
+    uint16_t head = 0; // Location of read/play head
+    uint16_t head_w = 0; // Location of write/record head
+    int8_t dt_pct = 50; //delaytime as percentage of delayline buffer
+    int8_t feedback = 50;
+    int8_t fdbk_g = feedback;
+    int8_t countdown = HEM_LOFI_PCM_SPEED;
+    uint8_t rate = HEM_LOFI_PCM_SPEED;
+    uint8_t rate_mod = rate;
+    int depth = 0; // bit reduction depth aka bitcrush
+    int cursor; //for gui
     
     void DrawWaveform() {
-        int inc = HEM_LOFI_PCM_BUFFER_SIZE / 256;
-        int disp[32];
-        int high = 1;
-        int pos = head - (inc * 15) - random(1,3); // Try to center the head
-        if (head < 0) head += length;
-        for (int i = 0; i < 32; i++)
+        int inc = rate_mod/2 + 1;
+        int pos = head - (inc * 31) - random(1,3); // Try to center the head
+        if (pos < 0) pos += length;
+        for (int i = 0; i < 64; i++)
         {
-            int v = (int)pcm[pos] - 127;
-            if (v < 0) v = 0;
-            if (v > high) high = v;
+            int height = Proportion(127 - (int)lofi_pcm_buffer[pos], 128, 16);
+            gfxLine(i, 46, i, 46+height);
+
             pos += inc;
-            if (pos >= HEM_LOFI_PCM_BUFFER_SIZE) pos -= length;
-            disp[i] = v;
-        }
-        
-        for (int x = 0; x < 32; x++)
-        {
-            int height = Proportion(disp[x], high, 30);
-            int margin = (32 - height) / 2;
-            gfxLine(x * 2, 30 + margin, x * 2, height + 30 + margin);
+            if (pos >= length) pos -= length;
         }
     }
     
-    void DrawStop(int x, int y) {
-        if (record || play || gated_record) gfxFrame(x, y, 11, 11);
-        else gfxRect(x, y, 11, 11);
-    }
-    
-    void DrawPlay(int x, int y) {
-        if (play) {
-            for (int i = 0; i < 11; i += 2)
-            {
-                gfxLine(x + i, y + i/2, x + i, y + 10 - i/2);
-                gfxLine(x + i + 1, y + i/2, x + i + 1, y + 10 - i/2);
+    void DrawSelector()
+    {
+        if (cursor < 2) {
+            for (int param = 0; param < 2; param++) {
+                gfxIcon(31 * param, 15, param ? GAUGE_ICON : CLOCK_ICON );
             }
+            gfxPrint(4 + pad(100, dt_pct), 15, dt_pct);
+            gfxPrint(36 + pad(1000, fdbk_g), 15, fdbk_g);
+            gfxCursor(10 + 31 * cursor, 23, 20);
         } else {
-            gfxLine(x, y, x, y + 10);
-            gfxLine(x, y, x + 10, y + 5);
-            gfxLine(x, y + 10, x + 10, y + 5);
+            gfxIcon(0, 15, WAVEFORM_ICON);
+            gfxIcon(8, 15, BURST_ICON);
+            gfxIcon(22, 15, LEFT_RIGHT_ICON);
+            gfxPrint(30, 15, rate_mod);
+            gfxIcon(42, 15, UP_DOWN_ICON);
+            gfxPrint(50, 15, depth);
+            gfxCursor(30 + (cursor-2)*20, 23, 14);
         }
     }
-    
-    void DrawRecord(int x, int y) {
-        gfxCircle(x + 5, y + 5, 5);
-        if (record || gated_record) {
-            for (int r = 1; r < 5; r++)
-            {
-                gfxCircle(x + 5, y + 5, r);
-            }
-        }
-    }
-    
+
 };
 
 

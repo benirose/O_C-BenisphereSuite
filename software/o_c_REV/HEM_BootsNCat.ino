@@ -21,10 +21,10 @@
 #include "vector_osc/HSVectorOscillator.h"
 #include "vector_osc/WaveformManager.h"
 
-#define BNC_MAX_PARAM 63
-
 class BootsNCat : public HemisphereApplet {
 public:
+
+    static constexpr uint8_t BNC_MAX_PARAM = 63;
 
     const char* applet_name() {
         return "BootsNCat";
@@ -95,15 +95,19 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawInterface();
     }
 
     void OnButtonPress() {
-        if (++cursor > 4) cursor = 0;
+        CursorAction(cursor, 4);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 4);
+            return;
+        }
+
         if (cursor == 4) { // Blend
             blend = constrain(blend + direction, 0, BNC_MAX_PARAM);
         } else {
@@ -121,11 +125,10 @@ public:
                 SetEGFreq(ch);
             }
         }
-        ResetCursor();
     }
         
-    uint32_t OnDataRequest() {
-        uint32_t data = 0;
+    uint64_t OnDataRequest() {
+        uint64_t data = 0;
         Pack(data, PackLocation {0,6}, tone[0]);
         Pack(data, PackLocation {6,6}, decay[0]);
         Pack(data, PackLocation {12,6}, tone[1]);
@@ -134,7 +137,7 @@ public:
         return data;
     }
 
-    void OnDataReceive(uint32_t data) {
+    void OnDataReceive(uint64_t data) {
         tone[0] = Unpack(data, PackLocation {0,6});
         decay[0] = Unpack(data, PackLocation {6,6});
         tone[1] = Unpack(data, PackLocation {12,6});
@@ -166,31 +169,26 @@ private:
     int8_t blend;
 
     void DrawInterface() {
+        const uint8_t w = 16;
+        const uint8_t x = 45;
+
         gfxPrint(1, 15, "BD Tone");
-        DrawKnobAt(15, tone[0], cursor == 0);
+        DrawSlider(x, 15, w, tone[0], BNC_MAX_PARAM, cursor == 0);
 
         gfxPrint(1, 25, "  Decay");
-        DrawKnobAt(25, decay[0], cursor == 1);
+        DrawSlider(x, 25, w, decay[0], BNC_MAX_PARAM, cursor == 1);
 
         gfxPrint(1, 35, "SD Tone");
-        DrawKnobAt(35, tone[1], cursor == 2);
+        DrawSlider(x, 35, w, tone[1], BNC_MAX_PARAM, cursor == 2);
 
         gfxPrint(1, 45, "  Decay");
-        DrawKnobAt(45, decay[1], cursor == 3);
+        DrawSlider(x, 45, w, decay[1], BNC_MAX_PARAM, cursor == 3);
 
         gfxPrint(1, 55, "Blend");
-        DrawKnobAt(55, blend, cursor == 4);
+        DrawSlider(x, 55, w, blend, BNC_MAX_PARAM, cursor == 4);
 
         // Level indicators
         ForEachChannel(ch) gfxInvert(1, 14 + (20 * ch), ProportionCV(levels[ch], 42), 9);
-    }
-
-    void DrawKnobAt(byte y, byte value, bool is_cursor) {
-        byte x = 45;
-        byte w = Proportion(value, BNC_MAX_PARAM, 16);
-        byte p = is_cursor ? 1 : 3;
-        gfxDottedLine(x, y + 4, 62, y + 4, p);
-        gfxRect(x + w, y, 2, 7);
     }
 
     void SetBDFreq() {
@@ -219,5 +217,5 @@ void BootsNCat_View(bool hemisphere) {BootsNCat_instance[hemisphere].BaseView();
 void BootsNCat_OnButtonPress(bool hemisphere) {BootsNCat_instance[hemisphere].OnButtonPress();}
 void BootsNCat_OnEncoderMove(bool hemisphere, int direction) {BootsNCat_instance[hemisphere].OnEncoderMove(direction);}
 void BootsNCat_ToggleHelpScreen(bool hemisphere) {BootsNCat_instance[hemisphere].HelpScreen();}
-uint32_t BootsNCat_OnDataRequest(bool hemisphere) {return BootsNCat_instance[hemisphere].OnDataRequest();}
-void BootsNCat_OnDataReceive(bool hemisphere, uint32_t data) {BootsNCat_instance[hemisphere].OnDataReceive(data);}
+uint64_t BootsNCat_OnDataRequest(bool hemisphere) {return BootsNCat_instance[hemisphere].OnDataRequest();}
+void BootsNCat_OnDataReceive(bool hemisphere, uint64_t data) {BootsNCat_instance[hemisphere].OnDataReceive(data);}

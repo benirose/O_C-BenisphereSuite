@@ -406,7 +406,7 @@ void Graphics::draw_char(char c, coord_t x, coord_t y) {
   coord_t w = Graphics::kFixedFontW;
   coord_t h = Graphics::kFixedFontH;
   font_glyph data = get_char_glyph(c);
-  if (c + w > kWidth) w = kWidth - x;
+  if (x + w > kWidth) w = kWidth - x;
   if (x < 0) {
     w += x;
     data += x;

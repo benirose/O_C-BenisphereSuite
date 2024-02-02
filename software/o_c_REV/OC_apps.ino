@@ -23,6 +23,9 @@
 #include "OC_apps.h"
 #include "OC_digital_inputs.h"
 #include "OC_autotune.h"
+#include "OC_patterns.h"
+#include "enigma/TuringMachine.h"
+#include "src/drivers/FreqMeasure/OC_FreqMeasure.h"
 
 #define DECLARE_APP(a, b, name, prefix) \
 { TWOCC<a,b>::value, name, \
@@ -34,8 +37,60 @@
   prefix ## _isr \
 }
 
-OC::App available_apps[] = {
+static constexpr OC::App available_apps[] = {
+
+  #ifdef ENABLE_APP_CALIBR8OR
+  DECLARE_APP('C','8', "Calibr8or", Calibr8or),
+  #endif
+  #ifdef ENABLE_APP_SCENES
+  DECLARE_APP('S','X', "Scenes", ScenesApp),
+  #endif
+
   DECLARE_APP('H','S', "Hemisphere", HEMISPHERE),
+  #ifdef ENABLE_APP_ASR
+  DECLARE_APP('A','S', "CopierMaschine", ASR),
+  #endif
+  #ifdef ENABLE_APP_H1200
+  DECLARE_APP('H','A', "Harrington 1200", H1200),
+  #endif
+  #ifdef ENABLE_APP_AUTOMATONNETZ
+  DECLARE_APP('A','T', "Automatonnetz", Automatonnetz),
+  #endif
+  #ifdef ENABLE_APP_QUANTERMAIN
+  DECLARE_APP('Q','Q', "Quantermain", QQ),
+  #endif
+  #ifdef ENABLE_APP_METAQ
+  DECLARE_APP('M','!', "Meta-Q", DQ),
+  #endif
+  #ifdef ENABLE_APP_POLYLFO
+  DECLARE_APP('P','L', "Quadraturia", POLYLFO),
+  #endif
+  #ifdef ENABLE_APP_LORENZ
+  DECLARE_APP('L','R', "Low-rents", LORENZ),
+  #endif
+  #ifdef ENABLE_APP_PIQUED
+  DECLARE_APP('E','G', "Piqued", ENVGEN),
+  #endif
+  #ifdef ENABLE_APP_SEQUINS
+  DECLARE_APP('S','Q', "Sequins", SEQ),
+  #endif
+  #ifdef ENABLE_APP_BBGEN
+  DECLARE_APP('B','B', "Dialectic Pong", BBGEN),
+  #endif
+  #ifdef ENABLE_APP_BYTEBEATGEN
+  DECLARE_APP('B','Y', "Viznutcracker", BYTEBEATGEN),
+  #endif
+  #ifdef ENABLE_APP_CHORDS
+  DECLARE_APP('A','C', "Acid Curds", CHORDS),
+  #endif
+  #ifdef ENABLE_APP_FPART
+  DECLARE_APP('F','P', "4 Parts", FPART),
+  #endif
+  #ifdef ENABLE_APP_PASSENCORE
+  // boring name version
+  // DECLARE_APP('P','Q', "Tension", PASSENCORE),
+  DECLARE_APP('P','Q', "Passencore", PASSENCORE),
+  #endif
   #ifdef ENABLE_APP_MIDI
   DECLARE_APP('M','I', "Captain MIDI", MIDI),
   #endif
@@ -52,6 +107,9 @@ OC::App available_apps[] = {
   DECLARE_APP('W','A', "Waveform Editor", WaveformEditor),
   #ifdef ENABLE_APP_PONG
   DECLARE_APP('P','O', "Pong", PONGGAME),
+  #endif
+  #ifdef ENABLE_APP_REFERENCES
+  DECLARE_APP('R','F', "References", REFS),
   #endif
   DECLARE_APP('B','R', "Backup / Restore", Backup),
   DECLARE_APP('S','E', "Setup / About", Settings),
@@ -71,7 +129,7 @@ struct GlobalSettings {
   bool reserved1;
   uint32_t DAC_scaling;
   uint16_t current_app_id;
-  
+
   OC::Scale user_scales[OC::Scales::SCALE_USER_LAST];
   OC::Pattern user_patterns[OC::Patterns::PATTERN_USER_ALL];
   HS::TuringMachine user_turing_machines[HS::TURING_MACHINE_COUNT];
@@ -119,10 +177,22 @@ void save_global_settings() {
   memcpy(global_settings.auto_calibration_data, OC::auto_calibration_data, sizeof(OC::auto_calibration_data));
   // scaling settings:
   global_settings.DAC_scaling = OC::DAC::store_scaling();
-  
+
   global_settings_storage.Save(global_settings);
   SERIAL_PRINTLN("Saved global settings: page_index %d", global_settings_storage.page_index());
 }
+
+static constexpr size_t total_storage_size() {
+    size_t used = 0;
+    for (size_t i = 0; i < NUM_AVAILABLE_APPS; ++i) {
+        used += available_apps[i].storageSize() + sizeof(AppChunkHeader);
+        if (used & 1) ++used; // align on 2-byte boundaries
+    }
+    return used;
+}
+
+static constexpr size_t totalsize = total_storage_size();
+static_assert(totalsize < OC::AppData::kAppDataSize, "EEPROM Allocation Exceeded");
 
 void save_app_data() {
   SERIAL_PRINTLN("Save app data... (%u bytes available)", OC::AppData::kAppDataSize);
@@ -173,7 +243,7 @@ void restore_app_data() {
       break;
     }
 
-    App *app = apps::find(chunk->id);
+    const App *app = apps::find(chunk->id);
     if (!app) {
       SERIAL_PRINTLN("App %02x not found, ignoring chunk...", app->id);
       if (!chunk->length)
@@ -208,11 +278,15 @@ namespace apps {
 void set_current_app(int index) {
   current_app = &available_apps[index];
   global_settings.current_app_id = current_app->id;
+  #ifdef VOR
+  VBiasManager *vbias_m = vbias_m->get();
+  vbias_m->SetStateForApp(current_app);
+  #endif
 }
 
-App *current_app = &available_apps[DEFAULT_APP_INDEX];
+const App *current_app = &available_apps[DEFAULT_APP_INDEX];
 
-App *find(uint16_t id) {
+const App *find(uint16_t id) {
   for (auto &app : available_apps)
     if (app.id == id) return &app;
   return nullptr;
@@ -238,7 +312,7 @@ void Init(bool reset_settings) {
   global_settings.encoders_enable_acceleration = OC_ENCODERS_ENABLE_ACCELERATION_DEFAULT;
   global_settings.reserved0 = false;
   global_settings.reserved1 = false;
-  global_settings.DAC_scaling = VOLTAGE_SCALING_1V_PER_OCT; 
+  global_settings.DAC_scaling = VOLTAGE_SCALING_1V_PER_OCT;
 
   if (reset_settings) {
     if (ui.ConfirmReset()) {
@@ -322,12 +396,18 @@ void draw_app_menu(const menu::ScreenCursor<5> &cursor) {
     item.SetPrintPos();
     graphics.movePrintPos(weegfx::Graphics::kFixedFontW, 0);
     graphics.print(available_apps[current].name);
-//    if (global_settings.current_app_id == available_apps[current].id)
-//       graphics.drawBitmap8(item.x + 2, item.y + 1, 4, bitmap_indicator_4x8);
+
+  //  if (global_settings.current_app_id == available_apps[current].id)
+  //     graphics.drawBitmap8(item.x + 2, item.y + 1, 4, bitmap_indicator_4x8);
     graphics.drawBitmap8(0, item.y + 1, 8,
         global_settings.current_app_id == available_apps[current].id ? CHECK_ON_ICON : CHECK_OFF_ICON);
     item.DrawCustom();
   }
+
+#ifdef VOR
+  VBiasManager *vbias_m = vbias_m->get();
+  vbias_m->DrawPopupPerhaps();
+#endif
 
   GRAPHICS_END_FRAME();
 }
@@ -360,22 +440,44 @@ void Ui::AppSettings() {
       if (IgnoreEvent(event))
         continue;
 
-      if (UI::EVENT_ENCODER == event.type && CONTROL_ENCODER_R == event.control) {
-        cursor.Scroll(event.value);
-      } else if (CONTROL_BUTTON_R == event.control) {
+      switch (event.control) {
+      case CONTROL_ENCODER_R:
+        if (UI::EVENT_ENCODER == event.type)
+          cursor.Scroll(event.value);
+        break;
+
+      case CONTROL_BUTTON_R:
         save = event.type == UI::EVENT_BUTTON_LONG_PRESS;
-        change_app = true;
-      } else if (CONTROL_BUTTON_L == event.control) {
-        ui.DebugStats();
-      } else if (CONTROL_BUTTON_UP == event.control) {
-        bool enabled = !global_settings.encoders_enable_acceleration;
-        SERIAL_PRINTLN("Encoder acceleration: %s", enabled ? "enabled" : "disabled");
-        ui.encoders_enable_acceleration(enabled);
-        global_settings.encoders_enable_acceleration = enabled;
+        change_app = event.type != UI::EVENT_BUTTON_DOWN; // true on button release
+        break;
+      case CONTROL_BUTTON_L:
+        if (UI::EVENT_BUTTON_PRESS == event.type)
+            ui.DebugStats();
+        break;
+      case CONTROL_BUTTON_UP:
+#ifdef VOR
+        // VBias menu for units without Range button
+        if (UI::EVENT_BUTTON_LONG_PRESS == event.type || UI::EVENT_BUTTON_DOWN == event.type) {
+          VBiasManager *vbias_m = vbias_m->get();
+          vbias_m->AdvanceBias();
+        }
+#endif
+        break;
+      case CONTROL_BUTTON_DOWN:
+        if (UI::EVENT_BUTTON_PRESS == event.type) {
+            bool enabled = !global_settings.encoders_enable_acceleration;
+            SERIAL_PRINTLN("Encoder acceleration: %s", enabled ? "enabled" : "disabled");
+            ui.encoders_enable_acceleration(enabled);
+            global_settings.encoders_enable_acceleration = enabled;
+        }
+        break;
+
+        default: break;
       }
     }
 
     draw_app_menu(cursor);
+    delay(2); // VOR calibration hack
   }
 
   event_queue_.Flush();
@@ -417,10 +519,10 @@ bool Ui::ConfirmReset() {
       UI::Event event = event_queue_.PullEvent();
       if (IgnoreEvent(event))
         continue;
-      if (CONTROL_BUTTON_R == event.control) {
+      if (CONTROL_BUTTON_R == event.control && UI::EVENT_BUTTON_PRESS == event.type) {
         confirm = true;
         done = true;
-      } else if (CONTROL_BUTTON_L == event.control) {
+      } else if (CONTROL_BUTTON_L == event.control && UI::EVENT_BUTTON_PRESS == event.type) {
         confirm = false;
         done = true;
       }

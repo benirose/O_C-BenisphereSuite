@@ -4,17 +4,46 @@ namespace OC {
 
   namespace Strings {
 
+  const char * const VERSION =
+#include "OC_version.h"
+#ifdef OC_VERSION_EXTRA
+    OC_VERSION_EXTRA
+#endif
+    "-"
+#ifdef OC_BUILD_TAG
+    OC_BUILD_TAG
+#endif
+    ;
+#ifdef BUCHLA_cOC
+  const char * const NAME = "NLM card O_C";
+  const char * const SHORT_NAME = "cOC";
+#elif defined(VOR)
+  const char * const NAME = "Plum Audio O_C+";
+  const char * const SHORT_NAME = "OC+";
+#else
+  const char * const NAME = "Ornaments & Crimes";
+  const char * const SHORT_NAME = "o_C";
+#endif
+
   const char * const seq_playmodes[] = {" -", "SEQ+1", "SEQ+2", "SEQ+3", "TR+1", "TR+2", "TR+3", "ARP", "S+H#1", "S+H#2", "S+H#3", "S+H#4", "CV#1", "CV#2", "CV#3", "CV#4"};
 
   const char * const channel_trigger_sources[] = {"TR1", "TR2", "TR3", "TR4", "cnt+", "cnt-"};
 
   const char * const seq_directions[] = {"fwd", "rev", "pnd1", "pnd2", "rnd", "brwn"};
 
+  const char * const scale_degrees_maj[] = {"I", "II", "III", "IV", "V", "VI", "VII"};
+  
+  const char* const scale_degrees_min[] = {"i", "ii", "iii", "iv", "v", "vi", "vii"};
+
+  const char* const accidentals[] = {"bb", "b", "", "#", "##"};
+
   const char * const scale_id[] = { ">#1", ">#2", ">#3", ">#4", " #1", " #2", " #3", " #4"};
   
   const char * const note_names[12] = { "C ", "C#", "D ", "D#", "E ", "F ", "F#", "G ", "G#", "A ", "A#", "B " };
   
   const char * const note_names_unpadded[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+
+  const char * const VOR_offsets[3] = { "-5V", "-3V", "0V"};
 
   const char * const trigger_input_names[4] = { "TR1", "TR2", "TR3", "TR4" };
 

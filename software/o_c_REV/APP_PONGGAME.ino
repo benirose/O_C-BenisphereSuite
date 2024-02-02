@@ -292,7 +292,7 @@ void PONGGAME_init() {
 	pong_instance.Init();
 }
 
-size_t PONGGAME_storageSize() {
+constexpr size_t PONGGAME_storageSize() {
 	return 0;
 }
 

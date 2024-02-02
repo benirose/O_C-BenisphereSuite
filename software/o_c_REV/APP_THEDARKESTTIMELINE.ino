@@ -52,8 +52,6 @@ class TheDarkestTimeline : public HSApplication, public SystemExclusiveHandler,
     public settings::SettingsBase<TheDarkestTimeline, DT_SETTING_LAST> {
 public:
 	void Start() {
-        quantizer.Init();
-        quantizer.Configure(OC::Scales::GetScale(5), 0xffff);
         Resume();
 	}
 
@@ -67,6 +65,8 @@ public:
             values_[DT_MIDI_CHANNEL] = 11;
             values_[DT_MIDI_CHANNEL_ALT] = 12;
         }
+        HS::quantizer[0].Init();
+        HS::quantizer[0].Configure(OC::Scales::GetScale(scale()), 0xffff);
 	}
 
     void Controller() {
@@ -81,9 +81,9 @@ public:
             int data2 = usbMIDI.getData2();
 
             // Handle system exclusive dump for Setup data
-            if (message == MIDI_MSG_SYSEX) OnReceiveSysEx();
+            if (message == HEM_MIDI_SYSEX) OnReceiveSysEx();
 
-            if (message == MIDI_MSG_NOTE_ON && channel == midi_channel_in()) {
+            if (message == HEM_MIDI_NOTE_ON && channel == midi_channel_in()) {
                 note_on = 1;
                 in_note_number = data1;
                 in_velocity = data2;
@@ -156,13 +156,13 @@ public:
 
             if (tl == 0) {
                 // This is a CV Timeline, so output the normal universe note
-                int32_t pitch = quantizer.Process(cv, root() << 7, transpose);
+                int32_t pitch = HS::quantizer[0].Process(cv, root() << 7, transpose);
                 Out(0, pitch);
 
                 // and then output the alternate universe note
                 uint8_t alt_idx = (idx + length()) % 32;
                 int alt_cv = get_data_at(alt_idx, tl);
-                pitch = quantizer.Process(alt_cv, root() << 7, transpose);
+                pitch = HS::quantizer[0].Process(alt_cv, root() << 7, transpose);
                 Out(1, pitch);
             } else if (clocked) {
                 // This is the Probability Timeline, and it's only calculated when
@@ -352,7 +352,7 @@ public:
         if (setup_screen == 0) change_value(DT_LENGTH, -direction);
         else change_value(setup_screen + 1, direction);
 
-        quantizer.Configure(OC::Scales::GetScale(scale()), 0xffff);
+        HS::quantizer[0].Configure(OC::Scales::GetScale(scale()), 0xffff);
         if (setup_screen > 0) setup_screen_timeout_countdown = DT_SETUP_SCREEN_TIMEOUT;
     }
 
@@ -370,7 +370,6 @@ private:
     int8_t cursor; // The play/record point within the sequence
     bool record[2]; // 0 = CV Timeline, 1 = Proability Timeline
     bool index_edit_enabled; // The index is being edited via the panel
-    braids::Quantizer quantizer;
     uint8_t setup_screen; // Setup screen state
     int setup_screen_timeout_countdown;
     bool clocked; // Sequencer has been clocked, and a probability trigger needs to be determined
@@ -513,6 +512,7 @@ private:
 };
 
 // MIDI channels are U8 instead of U4 because the channel number is not zero-indexed; 0 means "off"
+// TOTAL EEPROM SIZE: 8 bytes
 SETTINGS_DECLARE(TheDarkestTimeline, DT_SETTING_LAST) {
     {16, 1, 32, "Length", NULL, settings::STORAGE_TYPE_U8},
     {0, 0, 31, "Index", NULL, settings::STORAGE_TYPE_U8},
@@ -531,7 +531,7 @@ void TheDarkestTimeline_init() {
     TheDarkestTimeline_instance.BaseStart();
 }
 
-size_t TheDarkestTimeline_storageSize() {
+constexpr size_t TheDarkestTimeline_storageSize() {
     return TheDarkestTimeline::storageSize();
 }
 
@@ -568,14 +568,14 @@ void TheDarkestTimeline_handleButtonEvent(const UI::Event &event) {
     // For left encoder, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_L) {
         if (event.type == UI::EVENT_BUTTON_LONG_PRESS) TheDarkestTimeline_instance.OnLeftButtonLongPress();
-        else TheDarkestTimeline_instance.OnLeftButtonPress();
+        if (event.type == UI::EVENT_BUTTON_PRESS) TheDarkestTimeline_instance.OnLeftButtonPress();
     }
 
     // For right encoder, only handle press (long press is reserved)
     if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) TheDarkestTimeline_instance.OnRightButtonPress();
 
     // For up button, handle only press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_UP) TheDarkestTimeline_instance.OnUpButtonPress();
+    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS) TheDarkestTimeline_instance.OnUpButtonPress();
 
     // For down button, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_DOWN) {

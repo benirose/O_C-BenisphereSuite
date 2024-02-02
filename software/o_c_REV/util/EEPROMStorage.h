@@ -25,7 +25,7 @@
 
 /* Define a storage implemenation using teensy EEPROM */
 struct EEPROMStorage {
-  static const size_t LENGTH = 2048;
+  static const size_t LENGTH = E2END + 1;
 
   static void update(size_t addr, const void *data, size_t length) {
     EEPtr e = addr;

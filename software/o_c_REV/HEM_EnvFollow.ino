@@ -19,9 +19,17 @@
 // SOFTWARE.
 
 #define HEM_ENV_FOLLOWER_SAMPLES 166
+#define HEM_ENV_FOLLOWER_MAXSPEED 16
 
 class EnvFollow : public HemisphereApplet {
 public:
+
+    enum EnvFollowCursor {
+        MODE_1, MODE_2,
+        GAIN_1, GAIN_2,
+        SPEED,
+        MAX_CURSOR = SPEED
+    };
 
     const char* applet_name() {
         return "EnvFollow";
@@ -51,29 +59,49 @@ public:
 
         ForEachChannel(ch)
         {
-            if (In(ch) > max[ch]) max[ch] = In(ch);
-            if (target[ch] > signal[ch]) signal[ch]++;
-            else if (target[ch] < signal[ch]) signal[ch]--;
+            int v = abs(In(ch));
+            if (v > max[ch]) max[ch] = v;
+            if (target[ch] > signal[ch]) {
+                signal[ch] += speed;
+                if (signal[ch] > target[ch]) signal[ch] = target[ch];
+            }
+            else if (target[ch] < signal[ch]) {
+                signal[ch] -= speed;
+                if (signal[ch] < target[ch]) signal[ch] = target[ch];
+            }
             Out(ch, signal[ch]);
         }
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawInterface();
         gfxSkyline();
     }
 
     void OnButtonPress() {
-        if (++cursor > 3) cursor = 0;
-        ResetCursor();
+        CursorAction(cursor, MAX_CURSOR);
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor < 2) { // Gain per channel
-            gain[cursor] = constrain(gain[cursor] + direction, 1, 31);
-        } else {
-            duck[cursor - 2] = 1 - duck[cursor - 2];
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, MAX_CURSOR);
+            return;
+        }
+
+        switch (cursor) {
+        case GAIN_1:
+        case GAIN_2:
+            gain[cursor - GAIN_1] = constrain(gain[cursor - GAIN_1] + direction, 1, 31);
+            break;
+
+        case MODE_1:
+        case MODE_2:
+            duck[cursor] = 1 - duck[cursor];
+            break;
+
+        case SPEED:
+            speed = constrain(speed + direction, 1, HEM_ENV_FOLLOWER_MAXSPEED);
+            break;
         }
         ResetCursor();
     }
@@ -84,6 +112,7 @@ public:
         Pack(data, PackLocation {5,5}, gain[1]);
         Pack(data, PackLocation {10,1}, duck[0]);
         Pack(data, PackLocation {11,1}, duck[1]);
+        Pack(data, PackLocation {12,4}, speed - 1);
         return data;
     }
 
@@ -92,6 +121,8 @@ public:
         gain[1] = Unpack(data, PackLocation {5,5});
         duck[0] = Unpack(data, PackLocation {10,1});
         duck[1] = Unpack(data, PackLocation {11,1});
+        speed = Unpack(data, PackLocation {12,4}) + 1;
+        speed = constrain(speed, 1, HEM_ENV_FOLLOWER_MAXSPEED);
     }
 
 protected:
@@ -100,12 +131,12 @@ protected:
         help[HEMISPHERE_HELP_DIGITALS] = "";
         help[HEMISPHERE_HELP_CVS]      = "Inputs 1,2";
         help[HEMISPHERE_HELP_OUTS]     = "Follow/Duck";
-        help[HEMISPHERE_HELP_ENCODER]  = "Gain/Assign";
+        help[HEMISPHERE_HELP_ENCODER]  = "Gain/Assign/Speed";
         //                               "------------------" <-- Size Guide
     }
     
 private:
-    uint8_t cursor;
+    int cursor;
     int max[2];
     uint8_t countdown;
     int signal[2];
@@ -114,6 +145,7 @@ private:
     // Setting
     uint8_t gain[2];
     bool duck[2]; // Choose between follow and duck per channel
+    int speed = 1; // attack/release rate
 
     void DrawInterface() {
         ForEachChannel(ch)
@@ -124,10 +156,27 @@ private:
             // Gain
             gfxFrame(32 * ch, 25, gain[ch], 3);
 
-            if (cursor == ch && CursorBlink()) gfxRect(32 * ch, 25, gain[ch], 3);
-
         }
-        if (cursor > 1) gfxCursor(1 + (38 * (cursor - 2)), 23, 24);
+
+        switch (cursor) {
+        case MODE_1:
+        case MODE_2:
+            gfxCursor(1 + (38 * cursor), 23, 24);
+            break;
+
+        case GAIN_1:
+        case GAIN_2:
+            gfxCursor(32 * (cursor - GAIN_1), 29, gain[cursor - GAIN_1], 5);
+            break;
+        
+        case SPEED:
+            gfxIcon(20, 31, GAUGE_ICON);
+            gfxPrint(28, 31, speed);
+            gfxCursor(28, 39, 14);
+            break;
+
+        default: break;
+        }
     }
 
 };

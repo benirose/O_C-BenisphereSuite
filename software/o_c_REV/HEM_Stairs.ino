@@ -32,8 +32,11 @@
 class Stairs : public HemisphereApplet {
 public:
 
-    // Icons made with http://beigemaze.com/bitmap8x8.html  (Thanks for making this public!)
-    const uint8_t STAIRS_ICON[8] = {0x00,0x20,0x20,0x38,0x08,0x0e,0x02,0x02};  // Some stairs going up
+    enum StairsCursor {
+        STEPS,
+        DIRECTION,
+        RANDOM
+    };
 
     const char* applet_name() {
         return "Stairs";
@@ -61,6 +64,11 @@ public:
           graph_points[i] = 0;
         }
         */
+    }
+
+    void Reset() {
+        curr_step = (dir != 2) ? 0 : steps;  // Go to 0th or last step depending on direction
+        reverse = (dir != 2) ? 0 : 1;  // Reset reverse (really just for up/down mode)
     }
 
     void Controller() {
@@ -91,8 +99,7 @@ public:
         // Digital Input 1: Reset pulse
         reset_gate = Gate(1);  // For display
         if (Clock(1)) {
-            curr_step = (dir != 2) ? 0 : steps;  // Go to 0th or last step depending on direction
-            reverse = (dir != 2) ? 0 : 1;  // Reset reverse (really just for up/down mode)
+            Reset();
             ClockOut(1);  // BOC pulse output
         }
         
@@ -195,34 +202,34 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawDisplay();
     }
 
     void OnButtonPress() {
-      if(++cursor > 2) cursor = 0;
-
-      ResetCursor();  // Reset blink so it's immediately visible when moved
+        CursorAction(cursor, 2);
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 0) 
-        {
-            steps = constrain( steps += direction, 0, HEM_STAIRS_MAX_STEPS-1);  // constrain includes max
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 2);
+            return;
         }
-        else if (cursor == 1) 
-        {
-            dir = constrain( dir += direction, 0, 2);
+
+        switch ((StairsCursor)cursor) {
+        case STEPS:
+            steps = constrain( steps + direction, 0, HEM_STAIRS_MAX_STEPS-1);  // constrain includes max
+            break;
+        case DIRECTION:
+            dir = constrain( dir + direction, 0, 2);
 
             // Don't change current direction if up/down mode
             if(dir != 1)
-            {
               reverse = (dir == 2);  // Change current trend to up or down if required
-            }
-        } 
-        else 
-        {
+
+            break;
+        case RANDOM:
             rand = 1-rand;
+            break;
         }
 
     }
@@ -242,6 +249,7 @@ public:
 
         // Init from received data:
         reverse = (dir == 2);  // Set reverse if starting in down direction
+        Reset();
     }
 
 protected:
@@ -271,8 +279,7 @@ private:
     //int8_t graph_pos;  // Current position on the graph
     //int8_t graph_points[HEM_STAIRS_GRAPH_SIZE];
 
-    
-    int cursor;     // 0 = steps, 1 = direction, 2 = random
+    int cursor;     // StairsCursor
 
     void DrawDisplay()
     {
@@ -337,17 +344,16 @@ private:
       */
       
       // Cursor
-      if(cursor == 0)
-      {
+      switch ((StairsCursor)cursor) {
+      case STEPS:
         gfxCursor(16, 23, 15);  // flashing underline on the number
-      }
-      else if(cursor == 1)
-      {
+        break;
+      case DIRECTION:
         gfxCursor(34, 23, 9);  // flashing underline on up/down icon
-      }
-      else
-      {
+        break;
+      case RANDOM:
         gfxCursor(16, 43, 20);  // flashing underline on the random setting
+        break;
       }
     }
 };

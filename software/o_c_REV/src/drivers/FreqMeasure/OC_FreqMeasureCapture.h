@@ -61,6 +61,9 @@
 #elif defined(__AVR_AT90USB162__)
   #define CAPTURE_USE_TIMER1       // ICP1 is pin 16
 
+// Teensy 4.0 & 4.1
+#elif defined(__IMXRT1062__)
+
 // Sanguino
 #elif defined(__AVR_ATmega644P__) || defined(__AVR_ATmega644__)
   #define CAPTURE_USE_TIMER1       // ICP1 is pin 14

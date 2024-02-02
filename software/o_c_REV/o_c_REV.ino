@@ -36,11 +36,12 @@
 #include "OC_menus.h"
 #include "OC_strings.h"
 #include "OC_ui.h"
-#include "OC_version.h"
 #include "OC_options.h"
+#include "OC_strings.h"
 #include "src/drivers/display.h"
 #include "src/drivers/ADC/OC_util_ADC.h"
 #include "util/util_debugpins.h"
+#include "VBiasManager.h"
 
 unsigned long LAST_REDRAW_TIME = 0;
 uint_fast8_t MENU_REDRAW = true;
@@ -74,13 +75,8 @@ void FASTRUN CORE_timer_ISR() {
   OC::DAC::Update();
   display::Update();
 
-  // The ADC scan uses async startSingleRead/readSingle and single channel each
-  // loop, so should be fast enough even at 60us (check ADC::busy_waits() == 0)
-  // to verify. Effectively, the scan rate is ISR / 4 / ADC::kAdcSmoothing
-  // 100us: 10kHz / 4 / 4 ~ .6kHz
-  // 60us: 16.666K / 4 / 4 ~ 1kHz
-  // kAdcSmoothing == 4 has some (maybe 1-2LSB) jitter but seems "Good Enough".
-  OC::ADC::Scan();
+  // see OC_ADC.h for details; empirically (with current parameters), Scan_DMA() picks up new samples @ 5.55kHz
+  OC::ADC::Scan_DMA();
 
   // Pin changes are tracked in separate ISRs, so depending on prio it might
   // need extra precautions.
@@ -102,15 +98,44 @@ void FASTRUN CORE_timer_ISR() {
 
 void setup() {
   delay(50);
+  Serial.begin(9600);
+#if defined(__IMXRT1062__)
+  if (CrashReport) {
+    while (!Serial && millis() < 3000) ; // wait
+    Serial.println(CrashReport);
+    delay(1500);
+  }
+  #if defined(ARDUINO_TEENSY41)
+  OC::Pinout_Detect();
+  #endif
+#endif
+#if defined(__MK20DX256__)
   NVIC_SET_PRIORITY(IRQ_PORTB, 0); // TR1 = 0 = PTB16
+#endif
   SPI_init();
   SERIAL_PRINTLN("* O&C BOOTING...");
-  SERIAL_PRINTLN("* %s", OC_VERSION);
+  SERIAL_PRINTLN("* %s", OC::Strings::VERSION);
 
   OC::DEBUG::Init();
   OC::DigitalInputs::Init();
-  delay(400); 
+  #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
+  if (DAC8568_Uses_SPI) {
+    // DAC8568 Vref does not turn on by default like DAC8565
+    // best to turn on Vref as early as possible for analog
+    // circuitry to settle
+    OC::DAC::DAC8568_Vref_enable();
+  }
+  if (ADC33131D_Uses_FlexIO) {
+    // ADC33131D wants calibration for Vref, takes ~1150 ms
+    OC::ADC::ADC33131D_Vref_calibrate();
+  } else {
+  #endif
+    delay(400);
+  #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
+  }
+  #endif
   OC::ADC::Init(&OC::calibration_data.adc); // Yes, it's using the calibration_data before it's loaded...
+  OC::ADC::Init_DMA();
   OC::DAC::Init(&OC::calibration_data.dac);
 
   display::Init();
@@ -146,6 +171,11 @@ void setup() {
   }
   OC::ui.set_screensaver_timeout(OC::calibration_data.screensaver_timeout);
 
+#ifdef VOR
+  VBiasManager *vbias_m = vbias_m->get();
+  vbias_m->SetState(VBiasManager::BI);
+#endif
+
   // initialize apps
   OC::apps::Init(reset_settings);
 }
@@ -172,9 +202,15 @@ void FASTRUN loop() {
           OC_DEBUG_PROFILE_SCOPE(OC::DEBUG::MENU_draw_cycles);
           OC::apps::current_app->DrawMenu();
           ++menu_redraws;
+
+          #ifdef VOR
+          // JEJ:On app screens, show the bias popup, if necessary
+          VBiasManager *vbias_m = vbias_m->get();
+          vbias_m->DrawPopupPerhaps();
+          #endif
+
         } else {
-          //Blank the screen instead of drawing the screensaver (chysn 9/2/2018)
-          //OC::apps::current_app->DrawScreensaver();
+          OC::apps::current_app->DrawScreensaver();
         }
         MENU_REDRAW = 0;
         LAST_REDRAW_TIME = millis();
@@ -198,6 +234,36 @@ void FASTRUN loop() {
 
     if (millis() - LAST_REDRAW_TIME > REDRAW_TIMEOUT_MS)
       MENU_REDRAW = 1;
+
+    // check for request from PC to capture the screen
+    if (Serial && Serial.available() > 0) {
+      do { Serial.read(); } while (Serial.available() > 0);
+      display::frame_buffer.capture_request();
+    }
+
+    static size_t cap_idx = 0;
+    // check for frame buffer to have capture data ready
+    const uint8_t *capture_data = display::frame_buffer.captured();
+    if (capture_data && MENU_REDRAW) {
+      capture_data += cap_idx; // start where we left off
+
+      // limit to 64 bytes every 1ms
+      for (size_t i=0; i < 64; i++) {
+        uint8_t n = *capture_data++;
+        if (n < 16) Serial.print("0");
+        Serial.print(n, HEX);
+
+        if (++cap_idx >= display::frame_buffer.kFrameSize) {
+          // we're done sending this one
+          cap_idx = 0;
+          display::frame_buffer.capture_retire();
+          Serial.println();
+          Serial.flush();
+          break;
+        }
+      }
+    }
+
   }
 }
 

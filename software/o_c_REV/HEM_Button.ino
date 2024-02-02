@@ -22,38 +22,42 @@ class Button : public HemisphereApplet {
 public:
 
     const char* applet_name() { // Maximum 10 characters
-        return "Button";
+        return "Button2";
     }
 
 	/* Run when the Applet is selected */
     void Start() {
-        toggle_st = 0; // Set toggle state to off
-        trigger_out = 0; // Set trigger out queue to off
         trigger_countdown = 0;
     }
 
 	/* Run during the interrupt service routine, 16667 times per second */
     void Controller() {
-        if (Clock(0, 1)) OnButtonPress(); // Clock at Dig 0 emulates press (ignore forwarding)
-        if (trigger_out) {
-            ClockOut(0);
-            trigger_out = 0; // Clear trigger queue
-            trigger_countdown = 1667; // Trigger display countdown
+        ForEachChannel(ch) {
+            // Check physical trigger input to emulate button press (ignore forwarding)
+            if (Clock(ch, 1)) PressButton(ch);
+
+            // Handle output if triggered
+            if (trigger_out[ch]) {
+                if (gate_mode[ch])
+                    GateOut(ch, toggle_st[ch]);
+                else
+                    ClockOut(ch);
+
+                trigger_out[ch] = 0; // Clear trigger queue
+            }
         }
-        GateOut(1, toggle_st); // Send toggle state
         if (trigger_countdown) trigger_countdown--;
     }
 
 	/* Draw the screen */
     void View() {
-        gfxHeader(applet_name());
         DrawIndicator();
     }
 
 	/* Called when the encoder button for this hemisphere is pressed */
     void OnButtonPress() {
-        trigger_out = 1; // Set trigger queue
-        toggle_st = 1 - toggle_st; // Alternate toggle state when pressed
+        PressButton(channel);
+        trigger_countdown = 1667; // Trigger display countdown
     }
 
 	/* Called when the encoder for this hemisphere is rotated
@@ -61,7 +65,15 @@ public:
 	 * direction -1 is counterclockwise
 	 */
     void OnEncoderMove(int direction) {
-        /* Nothing for this applet */
+        if (direction > 0) // CW toggles which channel
+            channel = 1 - channel;
+        else { // CCW toggles between Trig/Gate output
+            // retrigger if switching from a Gate On to Trig mode
+            trigger_out[channel] = gate_mode[channel] && toggle_st[channel];
+
+            gate_mode[channel] = 1 - gate_mode[channel];
+            toggle_st[channel] = 0; // reset Gate to off
+        }
     }
         
     /* No state data for this applet
@@ -81,23 +93,44 @@ protected:
     /* Set help text. Each help section can have up to 18 characters. Be concise! */
     void SetHelp() {
         //                               "------------------" <-- Size Guide
-        help[HEMISPHERE_HELP_DIGITALS] = "1=Press Button";
+        help[HEMISPHERE_HELP_DIGITALS] = "1,2=Press Button";
         help[HEMISPHERE_HELP_CVS]      = "";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Trg B=Toggle";
-        help[HEMISPHERE_HELP_ENCODER]  = "P=Trg/Toggle";
+        help[HEMISPHERE_HELP_OUTS]     = "A,B=Trig/Gate Out";
+        help[HEMISPHERE_HELP_ENCODER]  = "T=Config P=Button";
         //                               "------------------" <-- Size Guide
     }
     
 private:
-    bool trigger_out; // Trigger output queue (output A/C)
-    bool toggle_st; // Toggle state (output B/D)
+    bool trigger_out[2] = {0,0}; // Trigger output queue (output A/C)
+    bool toggle_st[2] = {0,0}; // Toggle state (output B/D)
     int trigger_countdown; // For momentary display of trigger output
+    bool channel = 0; // selected channel, 0=(output A/C) 1=(output B/D)
+    bool gate_mode[2] = {0,1}; // mode flag for each channel, 0=trig, 1=gate toggle
 
     void DrawIndicator()
     {
-        if (trigger_countdown) gfxFrame(9, 42, 13, 13);
-        gfxBitmap(12, 45, 8, CLOCK_ICON);
-        gfxBitmap(44, 45, 8, toggle_st ? CLOSED_ICON : OPEN_ICON);
+        // Guide text
+        gfxIcon(1, 15, ROTATE_R_ICON);
+        gfxPrint(10, 15, "Channel");
+        gfxIcon(1, 24, ROTATE_L_ICON);
+        gfxPrint(10, 24, "Mode");
+
+        if (trigger_countdown) gfxFrame(9 + 32*channel, 42, 13, 13); // momentary manual trigger indicator
+
+        gfxIcon(12 + channel*32, 35, DOWN_BTN_ICON); // channel selector
+
+        ForEachChannel(ch) {
+            if (!gate_mode[ch])
+                gfxIcon(12 + ch*32, 45, CLOCK_ICON);
+            else
+                gfxIcon(12 + ch*32, 45, toggle_st[ch] ? CLOSED_ICON : OPEN_ICON);
+        }
+    }
+
+    void PressButton(bool ch = 0)
+    {
+        toggle_st[ch] = 1 - toggle_st[ch]; // Alternate toggle state when pressed
+        trigger_out[ch] = 1; // Set trigger queue
     }
 };
 

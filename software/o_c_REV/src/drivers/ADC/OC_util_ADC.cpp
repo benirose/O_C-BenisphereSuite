@@ -26,7 +26,7 @@
 /* ADC.cpp: Implements the control of one or more ADC modules of Teensy 3.x, LC
  *
  */
-
+#if defined(__MK20DX256__)
 #include "OC_util_ADC.h"
 
 
@@ -1305,4 +1305,5 @@ ADC::Sync_result ADC::readSynchronizedContinuous() {ADC::Sync_result res={0}; re
 void ADC::stopSynchronizedContinuous() {}
 
 #endif
+#endif // __MK20DX256__
 

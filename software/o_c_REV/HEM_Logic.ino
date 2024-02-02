@@ -49,13 +49,6 @@ public:
         selected = 0;
         operation[0] = 0;
         operation[1] = 2;
-        const char * op_name_list[] = {"AND", "OR", "XOR", "NAND", "NOR", "XNOR", "-CV-"};
-        LogicGateFunction logic_gate_list[] = {hem_AND, hem_OR, hem_XOR, hem_NAND, hem_NOR, hem_XNOR, hem_null};
-        for(int i = 0; i < HEMISPHERE_NUMBER_OF_LOGIC; i++) 
-        {
-            op_name[i] = op_name_list[i];
-            logic_gate[i] = logic_gate_list[i];    
-        }
     }
 
     void Controller() {
@@ -78,17 +71,20 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawSelector();
         DrawIndicator();
     }
 
     void OnButtonPress() {
-        selected = 1 - selected;
-        ResetCursor();
+        CursorAction(selected, 1);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(selected, direction, 1);
+            return;
+        }
+
         operation[selected] += direction;
         if (operation[selected] == HEMISPHERE_NUMBER_OF_LOGIC) operation[selected] = 0;
         if (operation[selected] < 0) operation[selected] = HEMISPHERE_NUMBER_OF_LOGIC - 1;
@@ -116,8 +112,8 @@ protected:
     }
     
 private:
-    const char* op_name[HEMISPHERE_NUMBER_OF_LOGIC];
-    LogicGateFunction logic_gate[HEMISPHERE_NUMBER_OF_LOGIC];
+    const char* op_name[HEMISPHERE_NUMBER_OF_LOGIC] = {"AND", "OR", "XOR", "NAND", "NOR", "XNOR", "-CV-"};
+    LogicGateFunction logic_gate[HEMISPHERE_NUMBER_OF_LOGIC] = {hem_AND, hem_OR, hem_XOR, hem_NAND, hem_NOR, hem_XNOR, hem_null};
     int operation[2];
     bool result[2];
     int source[2];

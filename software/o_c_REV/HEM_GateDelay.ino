@@ -42,7 +42,7 @@ public:
             ForEachChannel(ch)
             {
                 record(ch, Gate(ch));
-                int mod_time = Proportion(DetentedIn(ch), HEMISPHERE_MAX_CV, 1000) + time[ch];
+                int mod_time = Proportion(DetentedIn(ch), HEMISPHERE_MAX_INPUT_CV, 1000) + time[ch];
                 mod_time = constrain(mod_time, 0, 2000);
 
                 bool p = play(ch, mod_time);
@@ -56,19 +56,23 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawInterface();
     }
 
     void OnButtonPress() {
-        cursor = 1 - cursor;
+        CursorAction(cursor, 1);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 1);
+            return;
+        }
+
         if (time[cursor] > 100) direction *= 2;
         if (time[cursor] > 500) direction *= 2;
         if (time[cursor] > 1000) direction *= 2;
-        time[cursor] = constrain(time[cursor] += direction, 0, 2000);
+        time[cursor] = constrain(time[cursor] + direction, 0, 2000);
     }
         
     uint64_t OnDataRequest() {
@@ -98,20 +102,20 @@ private:
     int time[2]; // Length of each channel (in ms)
     uint16_t location[2]; // Location of record head (playback head = location + time)
     uint32_t last_gate[2]; // Time of last gate, for display of icon
-    uint8_t cursor;
+    int cursor;
     int16_t ms_countdown; // Countdown for 1 ms
 
     void DrawInterface() {
         ForEachChannel(ch)
         {
             int y = 15 + (ch * 25);
-            if (ch == cursor) gfxCursor(0, y + 8, 63);
 
             gfxPrint(1, y, time[ch]);
             gfxPrint("ms");
 
             if (OC::CORE::ticks - last_gate[ch] < 1667) gfxBitmap(54, y, 8, CLOCK_ICON);
         }
+        gfxCursor(0, 23 + (cursor * 25), 63);
     }
 
     /* Write the gate state into the tape at the tape head */

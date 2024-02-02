@@ -27,7 +27,7 @@
  *
  */
 
-
+#if defined(__MK20DX256__)
 
 #include "ADC_Module.h"
 
@@ -1304,3 +1304,4 @@ void ADC_Module::stopPDB() {
 }
 
 #endif
+#endif // __MK20DX256__

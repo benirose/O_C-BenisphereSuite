@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+// Logarhythm: Added triplets output (3 triggers per 4 input clocks) to the unused 2nd output
+
 class Shuffle : public HemisphereApplet {
 public:
 
@@ -31,41 +33,79 @@ public:
         which = 0;
         cursor = 1;
         last_tick = 0;
+        
+        triplet_which = 0;  // Triplets
+        next_trip_trigger = 0;
+        triplet_time = 0;
     }
 
     void Controller() {
         uint32_t tick = OC::CORE::ticks;
-        if (Clock(1)) {
+        if (Clock(1))
+        {
             which = 0; // Reset (next trigger will be even clock)
             last_tick = tick;
+            triplet_which = 0;  // Triplets reset to down beat
         }
 
-        if (Clock(0) && !Gate(1)) {
+        // continuously update CV modulated delay values, for display
+        ForEachChannel(ch)
+        {
+            _delay[ch] = delay[ch];
+            Modulate(_delay[ch], ch, 0, 100);
+        }
+
+        if (Clock(0))
+        {
+            // Triplets: Track what triplet timing should be to span 4 normal clocks
+            triplet_time = (ClockCycleTicks(0) * 4) / 3;
+            if(triplet_which == 0)
+            {
+              next_trip_trigger = tick;  // Trigger right now (downbeat)
+            }
+            
+            if(++triplet_which > 3)
+            {
+              triplet_which = 0;        
+            }
+            
+            // Swing
             which = 1 - which;
             if (last_tick) {
                 tempo = tick - last_tick;
-                int16_t d = delay[which] + Proportion(DetentedIn(which), HEMISPHERE_MAX_CV, 100);
-                d = constrain(d, 0, 100);
-                uint32_t delay_ticks = Proportion(d, 100, tempo);
+                uint32_t delay_ticks = Proportion(_delay[which], 100, tempo);
                 next_trigger = tick + delay_ticks;
             }
             last_tick = tick;
         }
 
+        // Shuffle output
         if (tick == next_trigger) ClockOut(0);
+
+        // Logarhythm: Triplets output
+        if(tick == next_trip_trigger)
+        {
+          next_trip_trigger = tick + triplet_time;  // Schedule the next triplet output
+          triplet_time = 0; // Ensure that triplets will stop being scheduled if clocks aren't received
+          ClockOut(1);
+        }
+
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawSelector();
         DrawIndicator();
     }
 
     void OnButtonPress() {
-        cursor = 1 - cursor;
+        CursorAction(cursor, 1);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 1);
+            return;
+        }
         delay[cursor] += direction;
         delay[cursor] = constrain(delay[cursor], 0, 99);
     }
@@ -87,7 +127,7 @@ protected:
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Reset";
         help[HEMISPHERE_HELP_CVS]      = "1=Odd Mod 2=Even";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Clock";
+        help[HEMISPHERE_HELP_OUTS]     = "A=Clock B=Triplets";
         help[HEMISPHERE_HELP_ENCODER]  = "Odd/Even Delay";
         //                               "------------------" <-- Size Guide
     }
@@ -99,15 +139,19 @@ private:
     uint32_t next_trigger; // The tick of the next scheduled trigger
     uint32_t tempo; // Calculated time between ticks
 
+    // Logarhythm: Triplets (output on out B)
+    uint32_t triplet_which; // The current 4 count of clocks used to determine triplet reset
+    uint32_t next_trip_trigger; // The tick of the next scheduled triplet trigger
+    uint32_t triplet_time;  // Number of ticks between triplet output pulses
+    
     // Settings
     int16_t delay[2]; // Percentage delay for even (0) and odd (1) clock
+    int16_t _delay[2]; // after CV modulation
 
     void DrawSelector() {
-        for (int i = 0; i < 2; i++)
+        ForEachChannel(i)
         {
-            int16_t d = delay[i] + Proportion(DetentedIn(i), HEMISPHERE_MAX_CV, 100);
-            d = constrain(d, 0, 100);
-            gfxPrint(32 + pad(10, d), 15 + (i * 10), d);
+            gfxPrint(32 + pad(10, _delay[i]), 15 + (i * 10), _delay[i]);
             gfxPrint("%");
             if (cursor == i) gfxCursor(32, 23 + (i * 10), 18);
         }
@@ -130,11 +174,9 @@ private:
         gfxCircle(53, 47, 1);
         gfxCircle(53, 55, 1);
 
-        for (int n = 0; n < 2; n++)
+        ForEachChannel(n)
         {
-            int16_t d = delay[n] + Proportion(DetentedIn(n), HEMISPHERE_MAX_CV, 100);
-            d = constrain(d, 0, 100);
-            int x = Proportion(d, 100, 20) + (n * 20) + 4;
+            int x = Proportion(_delay[n], 100, 20) + (n * 20) + 4;
             gfxBitmap(x, 48 - (which == n ? 3 : 0), 8, which == n ? NOTE_ICON : X_NOTE_ICON);
         }
 

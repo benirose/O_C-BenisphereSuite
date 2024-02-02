@@ -40,10 +40,17 @@
 #include "OC_calibration.h"
 #include "OC_autotune_presets.h"
 #include "OC_autotune.h"
+#if defined(__IMXRT1062__)
+#include <SPI.h>
+#endif
 
 #define SPICLOCK_30MHz   (SPI_CTAR_PBR(0) | SPI_CTAR_BR(0) | SPI_CTAR_DBR) //(60 / 2) * ((1+1)/2) = 30 MHz (= 24MHz, when F_BUS == 48000000)
 
 namespace OC {
+
+#ifdef VOR
+int DAC::kOctaveZero = 0;
+#endif
 
 /*static*/
 void DAC::Init(CalibrationData *calibration_data) {
@@ -53,20 +60,51 @@ void DAC::Init(CalibrationData *calibration_data) {
   restore_scaling(0x0);
 
   // set up DAC pins 
-  pinMode(DAC_CS, OUTPUT);
-  pinMode(DAC_RST,OUTPUT);
+  OC::pinMode(DAC_CS, OUTPUT);
+
+  // set Vbias, using onboard DAC - does nothing on non-VOR hardware
+  init_Vbias();
+  set_Vbias(2760); // default to Asymmetric
+  delay(10);
   
+#ifndef VOR
+  // VOR button uses the same pin as DAC_RST
+  OC::pinMode(DAC_RST,OUTPUT);
   #ifdef DAC8564 // A0 = 0, A1 = 0
     digitalWrite(DAC_RST, LOW); 
   #else  // default to DAC8565 - pull RST high 
     digitalWrite(DAC_RST, HIGH);
   #endif
+#endif
 
   history_tail_ = 0;
   memset(history_, 0, sizeof(uint16_t) * kHistoryDepth * DAC_CHANNEL_LAST);
 
+#if defined(__MK20DX256__)
   if (F_BUS == 60000000 || F_BUS == 48000000) 
     SPIFIFO.begin(DAC_CS, SPICLOCK_30MHz, SPI_MODE0);  
+
+#elif defined(__IMXRT1062__)
+  #if defined(ARDUINO_TEENSY40)
+  SPI.begin();
+  IOMUXC_SW_MUX_CTL_PAD_GPIO_B0_00 = 3; // DAC CS pin controlled by SPI
+  #elif defined(ARDUINO_TEENSY41)
+  if (DAC8568_Uses_SPI) {
+    // Assume DAC8568_Vref_enable() already called by  main program startup,
+    // so we don't need to do any more hardware init, and calling SPI.begin()
+    // again could cause problems.
+  } else {
+    SPI.begin();
+    IOMUXC_SW_MUX_CTL_PAD_GPIO_B0_00 = 3; // DAC CS pin controlled by SPI
+  }
+  if (ADC33131D_Uses_FlexIO) {
+    // ADC33131D wants pin 12 for data input, but SPI.begin() takes it away
+    // reconfigure pin mux to return pin 12 control to FlexIO
+    IOMUXC_SW_MUX_CTL_PAD_GPIO_B0_01 = 4 | 0x10;
+    IOMUXC_SW_PAD_CTL_PAD_GPIO_B0_01 = 0x100C0;
+  }
+  #endif
+#endif
 
   set_all(0xffff);
   Update();
@@ -193,6 +231,30 @@ uint32_t DAC::store_scaling() {
     _scaling |= (DAC_scaling[i] << (i * 8)); 
   return _scaling;
 }
+
+#if defined(__MK20DX256__)
+/*static*/ 
+void DAC::init_Vbias() {
+  /* using MK20 DAC0 for Vbias*/
+  VREF_TRM = 0x60; VREF_SC = 0xE1; // enable 1v2 reference
+  SIM_SCGC2 |= SIM_SCGC2_DAC0; // DAC clock
+  DAC0_C0 = DAC_C0_DACEN; // enable module + use internal 1v2 reference
+}
+/*static*/ 
+void DAC::set_Vbias(uint32_t data) {
+  *(volatile int16_t *)&(DAC0_DAT0L) = data;
+}
+
+#elif defined(__IMXRT1062__)
+void DAC::init_Vbias() {
+  // TODO Teensy 4.1
+}
+void DAC::set_Vbias(uint32_t data) {
+  // TODO Teensy 4.1
+}
+
+#endif
+
 /*static*/
 DAC::CalibrationData *DAC::calibration_data_ = nullptr;
 /*static*/
@@ -205,6 +267,7 @@ volatile size_t DAC::history_tail_;
 uint8_t DAC::DAC_scaling[DAC_CHANNEL_LAST];
 }; // namespace OC
 
+#if defined(__MK20DX256__)
 void set8565_CHA(uint32_t data) {
   #ifdef BUCHLA_cOC
   uint32_t _data = data;
@@ -269,8 +332,69 @@ void set8565_CHD(uint32_t data) {
   SPIFIFO.read();
 }
 
+#elif defined(__IMXRT1062__) // Teensy 4.1
+void set8565_CHA(uint32_t data) {
+  LPSPI4_TCR = (LPSPI4_TCR & 0xF8000000) | LPSPI_TCR_FRAMESZ(23)
+    | LPSPI_TCR_PCS(0) | LPSPI_TCR_RXMSK;
+  #ifdef BUCHLA_cOC
+  uint32_t _data = data;
+  #else
+  uint32_t _data = OC::DAC::MAX_VALUE - data;
+  #endif
+  #ifdef FLIP_180
+  _data = (0b00010110 << 16) | (_data & 0xFFFF);
+  #else
+  _data = (0b00010000 << 16) | (_data & 0xFFFF);
+  #endif
+  LPSPI4_TDR = _data;
+}
+
+void set8565_CHB(uint32_t data) {
+  #ifdef BUCHLA_cOC
+  uint32_t _data = data;
+  #else
+  uint32_t _data = OC::DAC::MAX_VALUE - data;
+  #endif
+  #ifdef FLIP_180
+  _data = (0b00010100 << 16) | (_data & 0xFFFF);
+  #else
+  _data = (0b00010010 << 16) | (_data & 0xFFFF);
+  #endif
+  LPSPI4_TDR = _data;
+}
+void set8565_CHC(uint32_t data) {
+  #ifdef BUCHLA_cOC
+  uint32_t _data = data;
+  #else
+  uint32_t _data = OC::DAC::MAX_VALUE - data;
+  #endif
+  #ifdef FLIP_180
+  _data = (0b00010010 << 16) | (_data & 0xFFFF);
+  #else
+  _data = (0b00010100 << 16) | (_data & 0xFFFF);
+  #endif
+  LPSPI4_TDR = _data;
+}
+void set8565_CHD(uint32_t data) {
+  #ifdef BUCHLA_cOC
+  uint32_t _data = data;
+  #else
+  uint32_t _data = OC::DAC::MAX_VALUE - data;
+  #endif
+  #ifdef FLIP_180
+  _data = (0b00010000 << 16) | (_data & 0xFFFF);
+  #else
+  _data = (0b00010110 << 16) | (_data & 0xFFFF);
+  #endif
+  LPSPI4_SR = LPSPI_SR_TCF; //  clear transmit complete flag before last write to FIFO
+  LPSPI4_TDR = _data;
+}
+
+#endif // __IMXRT1062__
+
 // adapted from https://github.com/xxxajk/spi4teensy3 (MISO disabled) : 
 
+#if defined(__MK20DX256__)
 void SPI_init() {
 
   uint32_t ctar0, ctar1;
@@ -303,4 +427,26 @@ void SPI_init() {
     SPI0_MCR = mcr;
   }
 }
+
+#elif defined(__IMXRT1062__)
+void SPI_init() {
+  // TODO Teensy 4.1
+}
+
+#if defined(ARDUINO_TEENSY41)
+void OC::DAC::DAC8568_Vref_enable() {
+  Serial.println("DAC8568 Vref enable");
+  SPI.begin();
+  IOMUXC_SW_MUX_CTL_PAD_GPIO_B0_00 = 3; // DAC CS pin controlled by SPI
+  SPI.beginTransaction(SPISettings(24000000, MSBFIRST, SPI_MODE0));
+  LPSPI4_TCR = (LPSPI4_TCR & 0xF8000000) | LPSPI_TCR_FRAMESZ(31)
+    | LPSPI_TCR_PCS(0) | LPSPI_TCR_RXMSK;
+  delayMicroseconds(10);
+  dac8568_raw_write(0x08000001); // turn on Vref (2.5V ±0.004%), static mode
+  delay(5);
+}
+#endif
+
+#endif // __IMXRT1062__
+
 // OC_DAC

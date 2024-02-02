@@ -18,6 +18,24 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+
+/*
+  ghostils:
+  Envelopes are now independent for control and mod source/destination allowing two individual ADSR's with Release MOD CV input per hemisphere.
+  * CV mod is now limited to release for each channel
+  * Output Level indicators have been shrunk to make room for additional on screen indicators for which envelope you are editing.
+  * Switching between envelopes is currently handled by simply pressing the encoder button until you pass the release stage on each envelope which will toggle the active envelope you are editing
+  * Envelope is indicated by A or B just above the ADSR segments.
+  * 
+  * TODO: UI Design:
+  * Update to allow menu to select CV destinations for CV Input Sources on CH1/CH2
+  *   This could be assignable to a different destination based on probability potentially as well
+  * Update to allow internal GATE/Trig count to apply a modulation value to any or each of the envelope segments 
+
+*/
+
+
+
 #define HEM_EG_ATTACK 0
 #define HEM_EG_DECAY 1
 #define HEM_EG_SUSTAIN 2
@@ -27,6 +45,12 @@
 
 #define HEM_SUSTAIN_CONST 35
 #define HEM_EG_DISPLAY_HEIGHT 30
+
+//-ghostils: DEFINE Main menu inactivity timeout ~5secs this will return the user to the main menu:
+#define HEM_EG_UI_INACT_TICKS 41666
+
+//-ghostils: amount of time to handle Double Encoder Press ~250ms.
+#define HEM_EG_UI_DBLPRESS_TICKS 4096
 
 // About four seconds
 #define HEM_EG_MAX_TICKS_AD 33333
@@ -43,22 +67,37 @@ public:
 
     void Start() {
         edit_stage = 0;
-        attack = 20;
-        decay = 30;
-        sustain = 120;
-        release = 25;
+        //attack = 20;
+        //decay = 30;
+        //sustain = 120;
+        //release = 25;
         ForEachChannel(ch)
         {
             stage_ticks[ch] = 0;
             gated[ch] = 0;
             stage[ch] = HEM_EG_NO_STAGE;
+
+            //-ghostils:Initialize ADSR channels independently
+            attack[ch] = 20;
+            decay[ch] = 30;
+            sustain[ch] = 120;
+            release[ch] = 25;
+            release_mod[ch] = 0;
         }
+
+        //-ghostils:Multiple ADSR Envelope Tracking:
+        curEG = 0;
+
     }
 
     void Controller() {
-        // Look for CV modification of attack
-        attack_mod = get_modification_with_input(0);
-        release_mod = get_modification_with_input(1);
+        // Look for CV modification
+        //attack_mod = get_modification_with_input(0);
+        //release_mod[0] = get_modification_with_input(1);
+
+        //-ghostils: Update CV1/CV2 to support release only but on each ADSR independently:
+        release_mod[0] = get_modification_with_input(0);
+        release_mod[1] = get_modification_with_input(1);
 
         ForEachChannel(ch)
         {
@@ -88,64 +127,89 @@ public:
                 gated[ch] = 0;
             }
 
+
             Out(ch, GetAmplitudeOf(ch));
         }
+
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawIndicator();
         DrawADSR();
     }
 
     void OnButtonPress() {
-        if (++edit_stage > HEM_EG_RELEASE) {edit_stage = HEM_EG_ATTACK;}
+      //if (++edit_stage > HEM_EG_RELEASE) {edit_stage = HEM_EG_ATTACK;}
+      //-ghostils: flip editing focus between A/B ADSR when we hit the end of the Release stage:
+      if (++edit_stage > HEM_EG_RELEASE) {
+        edit_stage = HEM_EG_ATTACK;
+        curEG ^= 1;
+        }
     }
 
     void OnEncoderMove(int direction) {
-        int adsr[4] = {attack, decay, sustain, release};
+        //-ghostils:Reference curEG as the indexer to current ADSR when editing stages:
+        int adsr[4] = {attack[curEG], decay[curEG], sustain[curEG], release[curEG]};
         adsr[edit_stage] = constrain(adsr[edit_stage] += direction, 1, HEM_EG_MAX_VALUE);
-        attack = adsr[HEM_EG_ATTACK];
-        decay = adsr[HEM_EG_DECAY];
-        sustain = adsr[HEM_EG_SUSTAIN];
-        release = adsr[HEM_EG_RELEASE];
+        attack[curEG] = adsr[HEM_EG_ATTACK];
+        decay[curEG] = adsr[HEM_EG_DECAY];
+        sustain[curEG] = adsr[HEM_EG_SUSTAIN];
+        release[curEG] = adsr[HEM_EG_RELEASE];
     }
 
     uint64_t OnDataRequest() {
+        //-ghostils:Update to use an array and snapshot the values using curEG as the index
         uint64_t data = 0;
-        Pack(data, PackLocation {0,8}, attack);
-        Pack(data, PackLocation {8,8}, decay);
-        Pack(data, PackLocation {16,8}, sustain);
-        Pack(data, PackLocation {24,8}, release);
+        Pack(data, PackLocation {0,8}, attack[curEG]);
+        Pack(data, PackLocation {8,8}, decay[curEG]);
+        Pack(data, PackLocation {16,8}, sustain[curEG]);
+        Pack(data, PackLocation {24,8}, release[curEG]);
         return data;
     }
 
     void OnDataReceive(uint64_t data) {
-        attack = Unpack(data, PackLocation {0,8});
-        decay = Unpack(data, PackLocation {8,8});
-        sustain = Unpack(data, PackLocation {16,8});
-        release = Unpack(data, PackLocation {24,8});
+        //-ghostils:Update to use an array and snapshot the values using curEG as the index
+        attack[curEG] = Unpack(data, PackLocation {0,8});
+        decay[curEG] = Unpack(data, PackLocation {8,8});
+        sustain[curEG] = Unpack(data, PackLocation {16,8});
+        release[curEG] = Unpack(data, PackLocation {24,8});
 
-        if (attack == 0) Start(); // If empty data, initialize
+        if (attack[curEG] == 0) Start(); // If empty data, initialize
     }
 
 protected:
     /* Set help text. Each help section can have up to 18 characters. Be concise! */
     void SetHelp() {
+        /*
         help[HEMISPHERE_HELP_DIGITALS] = "Gate 1=Ch1 2=Ch2";
         help[HEMISPHERE_HELP_CVS] = "Mod 1=Att 2=Rel";
         help[HEMISPHERE_HELP_OUTS] = "Amp A=Ch1 B=Ch2";
         help[HEMISPHERE_HELP_ENCODER] = "A/D/S/R";
+        */
+
+        //-ghostils:Update onboard help:
+        help[HEMISPHERE_HELP_DIGITALS] = "Gate 1=Ch1 2=Ch2";
+        help[HEMISPHERE_HELP_CVS] = "Mod 1=Rel 2=Rel";
+        help[HEMISPHERE_HELP_OUTS] = "Amp A=Ch1 B=Ch2";
+        help[HEMISPHERE_HELP_ENCODER] = "A/D/S/R";
     }
-    
+
 private:
     int edit_stage;
-    int attack; // Attack rate from 1-255 where 1 is fast
-    int decay; // Decay rate from 1-255 where 1 is fast
-    int sustain; // Sustain level from 1-255 where 1 is low
-    int release; // Release rate from 1-255 where 1 is fast
+    int attack[2]; // Attack rate from 1-255 where 1 is fast
+    int decay[2]; // Decay rate from 1-255 where 1 is fast
+    int sustain[2]; // Sustain level from 1-255 where 1 is low
+    int release[2]; // Release rate from 1-255 where 1 is fast
+
+    //-ghostils:TODO Modify to adjust independently for each envelope, we won't be able to do both Attack and Release simultaneously so we either have to build a menu or just do Release.
+    //-Parameterize 
+
     int attack_mod; // Modification to attack from CV1
-    int release_mod; // Modification to release from CV2
+
+    int release_mod[2]; // Modification to release from CV2
+
+    //-ghostils:Additions for tracking multiple ADSR's in each Hemisphere:
+    int curEG;
 
     // Stage management
     int stage[2]; // The current ASDR stage of the current envelope
@@ -161,12 +225,23 @@ private:
         ForEachChannel(ch)
         {
             int w = Proportion(GetAmplitudeOf(ch), HEMISPHERE_MAX_CV, 62);
-            gfxRect(0, 15 + (ch * 10), w, 6);
+            //-ghostils:Update to make smaller to allow for additional information on the screen:
+            //gfxRect(0, 15 + (ch * 10), w, 6);
+            gfxRect(0, 15 + (ch * 3), w, 2);
+        }
+
+        //-ghostils:Indicate which ADSR envelope we are selected on:
+        if(curEG == 0) {
+          gfxPrint(0,22,"A");
+          gfxInvert(0,21,7,9);
+        }else{
+          gfxPrint(0,22,"B");
+          gfxInvert(0,21,7,9);
         }
     }
 
     void DrawADSR() {
-        int length = attack + decay + release + HEM_SUSTAIN_CONST; // Sustain is constant because it's a level
+        int length = attack[curEG] + decay[curEG] + release[curEG] + HEM_SUSTAIN_CONST; // Sustain is constant because it's a level
         int x = 0;
         x = DrawAttack(x, length);
         x = DrawDecay(x, length);
@@ -175,22 +250,25 @@ private:
     }
 
     int DrawAttack(int x, int length) {
-        int xA = x + Proportion(attack, length, 62);
+        //-ghostils:Update to reference curEG:
+        int xA = x + Proportion(attack[curEG], length, 62);
         gfxLine(x, BottomAlign(0), xA, BottomAlign(HEM_EG_DISPLAY_HEIGHT), edit_stage != HEM_EG_ATTACK);
         return xA;
     }
 
     int DrawDecay(int x, int length) {
-        int xD = x + Proportion(decay, length, 62);
+        //-ghostils:Update to reference curEG:
+        int xD = x + Proportion(decay[curEG], length, 62);
         if (xD < 0) xD = 0;
-        int yS = Proportion(sustain, HEM_EG_MAX_VALUE, HEM_EG_DISPLAY_HEIGHT);
+        int yS = Proportion(sustain[curEG], HEM_EG_MAX_VALUE, HEM_EG_DISPLAY_HEIGHT);
         gfxLine(x, BottomAlign(HEM_EG_DISPLAY_HEIGHT), xD, BottomAlign(yS), edit_stage != HEM_EG_DECAY);
         return xD;
     }
 
     int DrawSustain(int x, int length) {
         int xS = x + Proportion(HEM_SUSTAIN_CONST, length, 62);
-        int yS = Proportion(sustain, HEM_EG_MAX_VALUE, HEM_EG_DISPLAY_HEIGHT);
+        //-ghostils:Update to reference curEG:
+        int yS = Proportion(sustain[curEG], HEM_EG_MAX_VALUE, HEM_EG_DISPLAY_HEIGHT);
         if (yS < 0) yS = 0;
         if (xS < 0) xS = 0;
         gfxLine(x, BottomAlign(yS), xS, BottomAlign(yS), edit_stage != HEM_EG_SUSTAIN);
@@ -198,14 +276,18 @@ private:
     }
 
     int DrawRelease(int x, int length) {
-        int xR = x + Proportion(release, length, 62);
-        int yS = Proportion(sustain, HEM_EG_MAX_VALUE, HEM_EG_DISPLAY_HEIGHT);
+        //-ghostils:Update to reference curEG:
+        int xR = x + Proportion(release[curEG], length, 62);
+        int yS = Proportion(sustain[curEG], HEM_EG_MAX_VALUE, HEM_EG_DISPLAY_HEIGHT);
         gfxLine(x, BottomAlign(yS), xR, BottomAlign(0), edit_stage != HEM_EG_RELEASE);
         return xR;
     }
 
     void AttackAmplitude(int ch) {
-        int effective_attack = constrain(attack + attack_mod, 1, HEM_EG_MAX_VALUE);
+        //-ghostils:Update to reference current channel:
+        //-Remove attack_mod CV:
+        //int effective_attack = constrain(attack[ch] + attack_mod, 1, HEM_EG_MAX_VALUE);
+        int effective_attack = constrain(attack[ch], 1, HEM_EG_MAX_VALUE);
         int total_stage_ticks = Proportion(effective_attack, HEM_EG_MAX_VALUE, HEM_EG_MAX_TICKS_AD);
         int ticks_remaining = total_stage_ticks - stage_ticks[ch];
         if (effective_attack == 1) ticks_remaining = 0;
@@ -221,14 +303,15 @@ private:
     }
 
     void DecayAmplitude(int ch) {
-        int total_stage_ticks = Proportion(decay, HEM_EG_MAX_VALUE, HEM_EG_MAX_TICKS_AD);
+        //-ghostils:Update to reference current channel:
+        int total_stage_ticks = Proportion(decay[ch], HEM_EG_MAX_VALUE, HEM_EG_MAX_TICKS_AD);
         int ticks_remaining = total_stage_ticks - stage_ticks[ch];
-        simfloat amplitude_remaining = amplitude[ch] - int2simfloat(Proportion(sustain, HEM_EG_MAX_VALUE, HEMISPHERE_MAX_CV));
-        if (sustain == 1) ticks_remaining = 0;
+        simfloat amplitude_remaining = amplitude[ch] - int2simfloat(Proportion(sustain[ch], HEM_EG_MAX_VALUE, HEMISPHERE_MAX_CV));
+        if (sustain[ch] == 1) ticks_remaining = 0;
         if (ticks_remaining <= 0) { // End of decay; move to sustain
             stage[ch] = HEM_EG_SUSTAIN;
             stage_ticks[ch] = 0;
-            amplitude[ch] = int2simfloat(Proportion(sustain, HEM_EG_MAX_VALUE, HEMISPHERE_MAX_CV));
+            amplitude[ch] = int2simfloat(Proportion(sustain[ch], HEM_EG_MAX_VALUE, HEMISPHERE_MAX_CV));
         } else {
             simfloat decrease = amplitude_remaining / ticks_remaining;
             amplitude[ch] -= decrease;
@@ -236,11 +319,14 @@ private:
     }
 
     void SustainAmplitude(int ch) {
-        amplitude[ch] = int2simfloat(Proportion(sustain - 1, HEM_EG_MAX_VALUE, HEMISPHERE_MAX_CV));
+        //-ghostils:Update to reference current channel:
+        amplitude[ch] = int2simfloat(Proportion(sustain[ch] - 1, HEM_EG_MAX_VALUE, HEMISPHERE_MAX_CV));
     }
 
     void ReleaseAmplitude(int ch) {
-        int effective_release = constrain(release + release_mod, 1, HEM_EG_MAX_VALUE) - 1;
+        //-ghostils:Update to reference current channel:
+        //-CV1 = ADSR A release MOD, CV2 = ADSR A release MOD
+        int effective_release = constrain(release[ch] + release_mod[ch], 1, HEM_EG_MAX_VALUE) - 1;
         int total_stage_ticks = Proportion(effective_release, HEM_EG_MAX_VALUE, HEM_EG_MAX_TICKS_R);
         int ticks_remaining = total_stage_ticks - stage_ticks[ch];
         if (effective_release == 0) ticks_remaining = 0;
@@ -256,7 +342,7 @@ private:
 
     int get_modification_with_input(int in) {
         int mod = 0;
-        mod = Proportion(DetentedIn(in), HEMISPHERE_MAX_CV, HEM_EG_MAX_VALUE / 2);
+        mod = Proportion(DetentedIn(in), HEMISPHERE_MAX_INPUT_CV, HEM_EG_MAX_VALUE / 2);
         return mod;
     }
 };

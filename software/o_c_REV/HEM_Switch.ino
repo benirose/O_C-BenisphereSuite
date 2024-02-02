@@ -49,7 +49,6 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawCaptions();
         DrawIndicator();
         gfxSkyline();

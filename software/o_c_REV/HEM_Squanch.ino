@@ -26,15 +26,22 @@
 
 class Squanch : public HemisphereApplet {
 public:
+    enum SquanchCursor {
+        SHIFT1, SHIFT2,
+        SCALE, ROOT_NOTE,
+
+        LAST_SETTING = ROOT_NOTE
+    };
 
     const char* applet_name() {
         return "Squanch";
     }
 
     void Start() {
-        quantizer.Init();
         scale = 5;
-        quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+        ForEachChannel(ch) {
+            QuantizerConfigure(ch, scale);
+        }
     }
 
     void Controller() {
@@ -52,8 +59,8 @@ public:
                 // output, the output is raised by one octave when Digital 2 is gated.
                 int32_t shift_alt = (ch == 1) ? DetentedIn(1) : Gate(1) * (12 << 7);
 
-                int32_t quantized = quantizer.Process(pitch, 0, shift[ch]);
-                Out(ch, quantized + shift_alt);
+                int32_t quantized = Quantize(ch, pitch + shift_alt, root << 7, shift[ch]);
+                Out(ch, quantized);
                 last_note[ch] = quantized;
             }
         }
@@ -61,23 +68,37 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawInterface();
     }
 
     void OnButtonPress() {
-        if (++cursor > 2) cursor = 0;
+        CursorAction(cursor, LAST_SETTING);
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 2) { // Scale selection
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, LAST_SETTING);
+            return;
+        }
+
+        switch (cursor) {
+        case SHIFT1:
+        case SHIFT2:
+            shift[cursor] = constrain(shift[cursor] + direction, -48, 48);
+            break;
+
+        case SCALE:
             scale += direction;
             if (scale >= OC::Scales::NUM_SCALES) scale = 0;
             if (scale < 0) scale = OC::Scales::NUM_SCALES - 1;
-            quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+            ForEachChannel(ch)
+                QuantizerConfigure(ch, scale);
             continuous = 1; // Re-enable continuous mode when scale is changed
-        } else {
-            shift[cursor] = constrain(shift[cursor] + direction, -48, 48);
+            break;
+
+        case ROOT_NOTE:
+            root = constrain(root + direction, 0, 11);
+            break;
         }
     }
         
@@ -86,6 +107,7 @@ public:
         Pack(data, PackLocation {0,8}, scale);
         Pack(data, PackLocation {8,8}, shift[0] + 48);
         Pack(data, PackLocation {16,8}, shift[1] + 48);
+        Pack(data, PackLocation {24,4}, root);
         return data;
     }
 
@@ -93,7 +115,10 @@ public:
         scale = Unpack(data, PackLocation {0,8});
         shift[0] = Unpack(data, PackLocation {8,8}) - 48;
         shift[1] = Unpack(data, PackLocation {16,8}) - 48;
-        quantizer.Configure(OC::Scales::GetScale(scale), 0xffff);
+        root = Unpack(data, PackLocation {24,4});
+        root = constrain(root, 0, 11);
+        ForEachChannel(ch)
+            QuantizerConfigure(ch, scale);
     }
 
 protected:
@@ -110,37 +135,43 @@ private:
     int cursor; // 0=A shift, 1=B shift, 2=Scale
     bool continuous = 1;
     int last_note[2]; // Last quantized note
-    braids::Quantizer quantizer;
 
     // Settings
     int scale;
+    uint8_t root;
     int16_t shift[2];
 
     void DrawInterface() {
-        const uint8_t notes[2][8] = {{0xc0, 0xe0, 0xe0, 0xe0, 0x7f, 0x02, 0x14, 0x08},
-                                     {0xc0, 0xa0, 0xa0, 0xa0, 0x7f, 0x00, 0x00, 0x00}};
+        const uint8_t * notes[2] = {NOTE_ICON, NOTE2_ICON};
+
+        // Shift for A/C
+        ForEachChannel(ch) {
+            gfxIcon(1 + ch*32, 14, notes[ch]);
+            gfxPrint(10 + pad(10, shift[ch]) + ch*32, 15, shift[ch] > -1 ? "+" : "");
+            gfxPrint(shift[ch]);
+        }
+
+        // Scale & Root Note
+        gfxIcon(1, 24, SCALE_ICON);
+        gfxPrint(10, 25, OC::scale_names_short[scale]);
+        gfxPrint(40, 25, OC::Strings::note_names_unpadded[root]);
 
         // Display icon if clocked
         if (!continuous) gfxIcon(56, 25, CLOCK_ICON);
 
-        // Shift for A/C
-        gfxIcon(1, 14, notes[0]);
-        gfxPrint(11, 15, shift[0] > -1 ? "+" : "");
-        gfxPrint(shift[0]);
-
-        // Shift for B/D
-        gfxIcon(32, 14, notes[1]);
-        gfxPrint(43 + pad(10, shift[1]), 15, shift[1] > -1 ? "+" : "");
-        gfxPrint(shift[1]);
-
-        // Scale
-        gfxBitmap(1, 24, 8, SCALE_ICON);
-        gfxPrint(12, 25, OC::scale_names_short[scale]);
-
         // Cursors
-        if (cursor == 0) gfxCursor(10, 23, 18);
-        if (cursor == 1) gfxCursor(42, 23, 18);
-        if (cursor == 2) gfxCursor(13, 33, 30); // Scale Cursor
+        switch (cursor) {
+        case SHIFT1:
+        case SHIFT2:
+            gfxCursor(10 + (cursor - SHIFT1)*32, 23, 19);
+            break;
+        case SCALE:
+            gfxCursor(10, 33, 25);
+            break;
+        case ROOT_NOTE:
+            gfxCursor(40, 33, 13);
+            break;
+        }
 
         // Little note display
 
@@ -149,9 +180,10 @@ private:
         ForEachChannel(ch)
         {
             int semitone = (last_note[ch] / 128) % 12;
-            int note_x = semitone * 4; // 4 pixels per semitone
-            if (note_x < 0) note_x = 0;
-            gfxIcon(10 + note_x, 41 + (10 * ch), notes[ch]);
+            while (semitone < 0) semitone += 12;
+            int note_x = semitone * 3; // pixels per semitone
+            gfxPrint(0, 41 + 10*ch, midi_note_numbers[MIDIQuantizer::NoteNumber(last_note[ch])] );
+            gfxIcon(19 + note_x, 41 + (10 * ch), notes[ch]);
         }
 
     }

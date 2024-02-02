@@ -44,6 +44,9 @@
 #define ADC_TEENSY_3_4
 #elif defined(__MK66FX1M0__) // Teensy 3.5
 #define ADC_TEENSY_3_5
+#elif defined(__IMXRT1062__) // Teensy 4.x (not really supported, but don't error)
+#define ADC_NUM_ADCS 1
+#define ADC_DIFF_PAIRS 0
 #else
 #error "Board not supported!"
 #endif
@@ -298,6 +301,8 @@ cycles. ADHSC should be used when the ADCLK exceeds the limit for ADHSC = 0.
     #define ADC_CFG1_HI_SPEED (ADC_CFG1_2MHZ)
     #define ADC_CFG1_VERY_HIGH_SPEED ADC_CFG1_HI_SPEED
 
+#elif defined(__IMXRT1062__) // Teensy 4.0 or 4.1
+// don't give a compile error
 #else
 #error "F_BUS must be 108, 60, 56, 54, 48, 40, 36, 24, 4 or 2 MHz"
 #endif
@@ -592,7 +597,7 @@ public:
     //! Disable PGA
     void disablePGA();
 
-
+#if defined(__MK20DX256__)
     //! Set continuous conversion mode
     void continuousMode() __attribute__((always_inline)) {
         setBit(ADC_SC3, ADC_SC3_ADCO_BIT);
@@ -651,7 +656,7 @@ public:
     volatile bool isPGAEnabled() __attribute__((always_inline)) {
         return getBit(ADC_PGA, ADC_PGA_PGAEN_BIT);
     }
-
+#endif
 
     //////////////// INFORMATION ABOUT VALID PINS //////////////////
 

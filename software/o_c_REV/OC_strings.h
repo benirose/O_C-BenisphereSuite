@@ -10,13 +10,22 @@ namespace OC {
   static const int kNumDelayTimes = 8;
 
   namespace Strings {
+    extern const char * const NAME;
+    extern const char * const SHORT_NAME;
+    extern const char * const VERSION;
+
     extern const char * const seq_playmodes[];
     extern const char * const channel_trigger_sources[];
     extern const char * const seq_directions[];
+
+    extern const char * const scale_degrees_maj[];
+    extern const char * const scale_degrees_min[];
+    extern const char * const accidentals[];
     extern const char * const scale_id[];
     extern const char * const channel_id[];
     extern const char * const note_names[];
     extern const char * const note_names_unpadded[];
+    extern const char * const VOR_offsets[];    
     extern const char * const trigger_input_names[];
     extern const char * const trigger_input_names_none[];
     extern const char * const cv_input_names[];

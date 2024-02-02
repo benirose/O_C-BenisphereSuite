@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 
+#if defined(__MK20DX256__)
 #include "RingBufferDMA.h"
 
 // Point static_ringbuffer_dma to an RingBufferDMA object
@@ -171,3 +172,4 @@ int16_t RingBufferDMA::read() {
 uint16_t RingBufferDMA::increase(uint16_t p) {
     return (p + 1)&(2*b_size-1);
 }
+#endif // __MK20DX256__

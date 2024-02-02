@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 
+#if defined(__MK20DX256__)
 #include "RingBuffer.h"
 
 
@@ -62,3 +63,4 @@ int RingBuffer::read() {
 int RingBuffer::increase(int p) {
     return (p + 1)&(2*b_size-1);
 }
+#endif // __MK20DX256__

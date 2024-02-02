@@ -27,6 +27,9 @@
 
 class Burst : public HemisphereApplet {
 public:
+    enum BurstCursor {
+
+    };
 
     const char* applet_name() {
         return "Burst";
@@ -51,7 +54,7 @@ public:
             number = constrain(number, 1, HEM_BURST_NUMBER_MAX);
             last_number_cv_tick = OC::CORE::ticks;
         }
-        int spacing_mod = clocked ? 0 : Proportion(DetentedIn(1), HEMISPHERE_MAX_CV, 500);
+        int spacing_mod = clocked ? 0 : Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, 500);
 
         // Get timing information
         if (Clock(0)) {
@@ -116,37 +119,42 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawSelector();
         DrawIndicator();
     }
 
     void OnButtonPress() {
-        cursor += 1;
-        if (cursor > 4) cursor = 0;
-        if (cursor > 3 && !clocked) cursor = 0;
+        CursorAction(cursor, clocked ? 4 : 3);
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 0) number = constrain(number += direction, 1, HEM_BURST_NUMBER_MAX);
-        if (cursor == 1) {
-            spacing = constrain(spacing += direction, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, clocked ? 4 : 3);
+            return;
+        }
+
+        switch (cursor) {
+        case 0:
+            number = constrain(number + direction, 1, HEM_BURST_NUMBER_MAX);
+            break;
+        case 1:
+            spacing = constrain(spacing + direction, HEM_BURST_SPACING_MIN, HEM_BURST_SPACING_MAX);
             clocked = 0;
-        }
-        if (cursor == 2) {
-            accel = constrain(accel += direction, -HEM_BURST_ACCEL_MAX, HEM_BURST_ACCEL_MAX);
-        }
+            break;
+        case 2:
+            accel = constrain(accel + direction, -HEM_BURST_ACCEL_MAX, HEM_BURST_ACCEL_MAX);
+            break;
+        case 3:
+            jitter = constrain(jitter + direction, 0, HEM_BURST_JITTER_MAX);
+            break;
 
-        if (cursor == 3) {
-            jitter = constrain(jitter += direction, 0, HEM_BURST_JITTER_MAX);
-        }
-
-        if (cursor == 4) {
+        case 4:
             div += direction;
             if (div > HEM_BURST_CLOCKDIV_MAX) div = HEM_BURST_CLOCKDIV_MAX;
             if (div < -HEM_BURST_CLOCKDIV_MAX) div = -HEM_BURST_CLOCKDIV_MAX;
             if (div == 0) div = direction > 0 ? 1 : -2; // No such thing as 1/1 Multiple
             if (div == -1) div = 1; // Must be moving up to hit -1 (see previous line)
+            break;
         }
     }
         
@@ -199,7 +207,7 @@ private:
     void DrawSelector() {
         // Number
         gfxPrint(1, 15, number);
-        gfxPrint(28, 15, "bursts");
+        gfxPrint(27, 15, "bursts");
 
         // Spacing
         gfxPrint(1, 25, clocked ? get_effective_spacing() : spacing);
@@ -210,8 +218,8 @@ private:
         gfxPrint(10, 35, accel);
 
         // Jitter
-        gfxIcon(30, 34, RANDOM_ICON);
-        gfxPrint(38, 35, jitter);
+        gfxIcon(32, 34, RANDOM_ICON);
+        gfxPrint(40, 35, jitter);
 
         // Div
         if (clocked) {
@@ -222,9 +230,9 @@ private:
         }
 
         // Cursor
-        if (cursor < 2) gfxCursor(1, 23 + (cursor * 10), 62);
-        if (cursor == 2) gfxCursor(10, 43, 12);
-        if (cursor == 3) gfxCursor(38, 43, 12);
+        if (cursor < 2) gfxCursor(1, 23 + (cursor * 10), 13 + 12*cursor);
+        if (cursor == 2) gfxCursor(10, 43, 19);
+        if (cursor == 3) gfxCursor(40, 43, 13);
         if (cursor == 4) gfxCursor(1, 53, 62);
     }
 

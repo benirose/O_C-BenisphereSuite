@@ -2,6 +2,7 @@
 #define OC_UI_H_
 
 #include "OC_config.h"
+#include "OC_options.h"
 #include "OC_debug.h"
 #include "UI/ui_button.h"
 #include "UI/ui_encoder.h"
@@ -27,13 +28,22 @@ enum UiControl {
   CONTROL_BUTTON_L    = 0x4,
   CONTROL_BUTTON_R    = 0x8,
 #endif
-  CONTROL_BUTTON_MASK = 0xf,
 
+#ifdef VOR
+  CONTROL_BUTTON_M    = 0x10,
+  CONTROL_ENCODER_L   = 0x20,
+  CONTROL_ENCODER_R   = 0x40,
+
+  CONTROL_LAST = 6,
+  CONTROL_BUTTON_LAST = 5,
+#else
+  CONTROL_BUTTON_MASK = 0xf,
   CONTROL_ENCODER_L   = 0x10,
   CONTROL_ENCODER_R   = 0x20,
 
   CONTROL_LAST = 5,
   CONTROL_BUTTON_LAST = 4,
+#endif
 };
 
 static inline uint16_t control_mask(unsigned i) {
@@ -50,7 +60,7 @@ enum UiMode {
 class Ui {
 public:
   static const size_t kEventQueueDepth = 16;
-  static const uint32_t kLongPressTicks = 1000;
+  static const uint32_t kLongPressTicks = 500;
 
   Ui() { }
 
@@ -61,7 +71,7 @@ public:
   void DebugStats();
   void Calibrate();
   void AppSettings();
-  UiMode DispatchEvents(OC::App *app);
+  UiMode DispatchEvents(const OC::App *app);
 
   void Poll();
   void _Poke();
@@ -117,8 +127,8 @@ private:
   uint32_t ticks_;
   uint32_t screensaver_timeout_;
 
-  UI::Button buttons_[4];
-  uint32_t button_press_time_[4];
+  UI::Button buttons_[CONTROL_BUTTON_LAST];
+  uint32_t button_press_time_[CONTROL_BUTTON_LAST];
   uint16_t button_state_;
   uint16_t button_ignore_mask_;
   bool screensaver_;
@@ -154,6 +164,7 @@ private:
     }
     if (screensaver_) {
       screensaver_ = false;
+      SetButtonIgnoreMask(); // ignore whatever button is about to be released
       ignore = true;
     }
 

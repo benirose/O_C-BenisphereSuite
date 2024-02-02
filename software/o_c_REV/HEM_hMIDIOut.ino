@@ -42,8 +42,6 @@ public:
         legato = 1;
         log_index = 0;
 
-        const char * fn_name_list[] = {"Mod", "Aft", "Bend", "Veloc"};
-        for (int i = 0; i < 4; i++) fn_name[i] = fn_name_list[i];
     }
 
     void Controller() {
@@ -130,21 +128,29 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawMonitor();
         if (cursor == 4) DrawLog();
         else DrawSelector();
     }
 
     void OnButtonPress() {
-        if (++cursor > 4) cursor = 0;
-        ResetCursor();
+        if (cursor == 3 && !EditMode()) { // special case to toggle legato
+            legato = 1 - legato;
+            ResetCursor();
+            return;
+        }
+
+        CursorAction(cursor, 4);
     }
 
     void OnEncoderMove(int direction) {
-        if (cursor == 0) channel = constrain(channel += direction, 0, 15);
-        if (cursor == 1) transpose = constrain(transpose += direction, -24, 24);
-        if (cursor == 2) function = constrain(function += direction, 0, 3);
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 4);
+            return;
+        }
+        if (cursor == 0) channel = constrain(channel + direction, 0, 15);
+        if (cursor == 1) transpose = constrain(transpose + direction, -24, 24);
+        if (cursor == 2) function = constrain(function + direction, 0, 3);
         if (cursor == 3) legato = direction > 0 ? 1 : 0;
         ResetCursor();
     }
@@ -189,7 +195,7 @@ private:
     bool legato_on; // The note handler may currently respond to legato note changes
     int last_tick; // Most recent MIDI message sent
     int adc_lag_countdown;
-    const char* fn_name[4];
+    const char* fn_name[4] = {"Mod", "Aft", "Bend", "Veloc"};
 
     // Logging
     MIDILogEntry log[7];

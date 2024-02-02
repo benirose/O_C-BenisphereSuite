@@ -23,11 +23,18 @@ static constexpr uint32_t DIGITAL_INPUT_2_MASK = DIGITAL_INPUT_MASK(DIGITAL_INPU
 static constexpr uint32_t DIGITAL_INPUT_3_MASK = DIGITAL_INPUT_MASK(DIGITAL_INPUT_3);
 static constexpr uint32_t DIGITAL_INPUT_4_MASK = DIGITAL_INPUT_MASK(DIGITAL_INPUT_4);
 
+#if defined(__MK20DX256__) // Teensy 3.2
+
 template <DigitalInput> struct InputPinDesc { };
 template <> struct InputPinDesc<DIGITAL_INPUT_1> { static constexpr int PIN = TR1; };
 template <> struct InputPinDesc<DIGITAL_INPUT_2> { static constexpr int PIN = TR2; };
 template <> struct InputPinDesc<DIGITAL_INPUT_3> { static constexpr int PIN = TR3; };
 template <> struct InputPinDesc<DIGITAL_INPUT_4> { static constexpr int PIN = TR4; };
+
+void tr1_ISR();
+void tr2_ISR();
+void tr3_ISR();
+void tr4_ISR();
 
 class DigitalInputs {
 public:
@@ -38,17 +45,17 @@ public:
 
   static void Scan();
 
-  // @return mask of all pins cloked since last call, reset state
+  // @return mask of all pins cloked since last call (does not reset state)
   static inline uint32_t clocked() {
     return clocked_mask_;
   }
 
-  // @return mask if pin clocked since last call and reset state
+  // @return mask if pin clocked since last call (does not reset state)
   template <DigitalInput input> static inline uint32_t clocked() {
     return clocked_mask_ & (0x1 << input);
   }
 
-  // @return mask if pin clocked since last call, reset state
+  // @return mask if pin clocked since last call (does not reset state)
   static inline uint32_t clocked(DigitalInput input) {
     return clocked_mask_ & (0x1 << input);
   }
@@ -61,6 +68,12 @@ public:
     return !digitalReadFast(InputPinMap(input));
   }
 
+private:
+  // clock() only called from interrupt functions
+  friend void tr1_ISR();
+  friend void tr2_ISR();
+  friend void tr3_ISR();
+  friend void tr4_ISR();
   template <DigitalInput input> static inline void clock() {
     clocked_[input] = 1;
   }
@@ -91,6 +104,48 @@ private:
     }
   }
 };
+
+
+#elif defined(__IMXRT1062__) // Teensy 4.0 or 4.1
+
+class DigitalInputs {
+public:
+  static void Init();
+  static void reInit() { Init(); }
+  static void Scan();
+
+  // @return mask of all pins clocked since last Scan()
+  static inline uint32_t clocked() {
+    return clocked_mask_;
+  }
+  // @return mask if pin clocked since last Scan()
+  template <DigitalInput input> static inline uint32_t clocked() {
+    return clocked(input);
+  }
+  static inline uint32_t clocked(DigitalInput input) {
+    return clocked_mask_ & (0x1 << input);
+  }
+  template <DigitalInput input> static inline bool read_immediate() {
+    return read_immediate(input);
+  }
+  static inline bool read_immediate(DigitalInput input) {
+    switch (input) {
+      case DIGITAL_INPUT_1: return (digitalRead(TR1) == LOW) ? true : false;
+      case DIGITAL_INPUT_2: return (digitalRead(TR2) == LOW) ? true : false;
+      case DIGITAL_INPUT_3: return (digitalRead(TR3) == LOW) ? true : false;
+      case DIGITAL_INPUT_4: return (digitalRead(TR4) == LOW) ? true : false;
+      case DIGITAL_INPUT_LAST: break;
+    }
+    return false;
+  }
+private:
+  static uint8_t clocked_mask_;
+  static IMXRT_GPIO_t *port[DIGITAL_INPUT_LAST];
+  static uint32_t bitmask[DIGITAL_INPUT_LAST];
+};
+
+#endif
+
 
 // Helper class for visualizing digital inputs with decay
 // Uses 4 bits for decay

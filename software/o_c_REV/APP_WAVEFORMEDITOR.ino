@@ -371,7 +371,7 @@ void WaveformEditor_init() {
 }
 
 // Not using O_C Storage
-size_t WaveformEditor_storageSize() {return 0;}
+constexpr size_t WaveformEditor_storageSize() {return 0;}
 size_t WaveformEditor_save(void *storage) {return 0;}
 size_t WaveformEditor_restore(const void *storage) {return 0;}
 
@@ -400,14 +400,14 @@ void WaveformEditor_handleButtonEvent(const UI::Event &event) {
     // For left encoder, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_L) {
         if (event.type == UI::EVENT_BUTTON_LONG_PRESS) WaveformEditor_instance.OnLeftButtonLongPress();
-        else WaveformEditor_instance.OnLeftButtonPress();
+        if (event.type == UI::EVENT_BUTTON_PRESS) WaveformEditor_instance.OnLeftButtonPress();
     }
 
     // For right encoder, only handle press (long press is reserved)
     if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) WaveformEditor_instance.OnRightButtonPress();
 
     // For up button, handle only press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_UP) WaveformEditor_instance.OnUpButtonPress();
+    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS) WaveformEditor_instance.OnUpButtonPress();
 
     // For down button, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_DOWN) {

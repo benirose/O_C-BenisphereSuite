@@ -5,6 +5,7 @@
 #include <string.h>
 #include "OC_config.h"
 #include "OC_options.h"
+#include "OC_gpio.h"
 #include "util/util_math.h"
 #include "util/util_macros.h"
 
@@ -12,6 +13,15 @@ extern void set8565_CHA(uint32_t data);
 extern void set8565_CHB(uint32_t data);
 extern void set8565_CHC(uint32_t data);
 extern void set8565_CHD(uint32_t data);
+#if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
+static inline void dac8568_raw_write(uint32_t data) {
+  LPSPI4_TDR = data; // assume writes always at pace SPI FIFO can absorb
+}
+static inline void dac8568_set_channel(uint32_t channel, uint32_t data) {
+  data = 0xFFFF - data;
+  dac8568_raw_write(0x03000000 | ((channel & 0x07) << 20) | ((data & 0xFFFF) << 4));
+}
+#endif
 extern void SPI_init();
 
 enum DAC_CHANNEL {
@@ -41,6 +51,11 @@ public:
 
   #ifdef BUCHLA_4U
     static constexpr int kOctaveZero = 0;
+  #elif defined(VOR) 
+    static int kOctaveZero;
+    static constexpr int VBiasUnipolar = 3900;   // onboard DAC @ Vref 1.2V (internal), 1.75x gain
+    static constexpr int VBiasBipolar = 2000;    // onboard DAC @ Vref 1.2V (internal), 1.75x gain
+    static constexpr int VBiasAsymmetric = 2760; // onboard DAC @ Vref 1.2V (internal), 1.75x gain
   #else
     static constexpr int kOctaveZero = 3;
   #endif
@@ -50,6 +65,9 @@ public:
   };
 
   static void Init(CalibrationData *calibration_data);
+  #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
+  static void DAC8568_Vref_enable();
+  #endif
 
   static uint8_t calibration_data_used(uint8_t channel_id);
   static void set_auto_channel_calibration_data(uint8_t channel_id);
@@ -62,6 +80,8 @@ public:
   static void restore_scaling(uint32_t scaling);
   static uint8_t get_voltage_scaling(uint8_t channel_id);
   static uint32_t store_scaling();
+  static void set_Vbias(uint32_t data);
+  static void init_Vbias();
   
   static void set_all(uint32_t value) {
     for (int i = DAC_CHANNEL_A; i < DAC_CHANNEL_LAST; ++i)
@@ -207,11 +227,22 @@ public:
   }
 
   static void Update() {
-
-    set8565_CHA(values_[DAC_CHANNEL_A]);
-    set8565_CHB(values_[DAC_CHANNEL_B]);
-    set8565_CHC(values_[DAC_CHANNEL_C]);
-    set8565_CHD(values_[DAC_CHANNEL_D]);
+    #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
+      if (DAC8568_Uses_SPI) {
+        dac8568_set_channel(0, values_[DAC_CHANNEL_A]);
+        dac8568_set_channel(1, values_[DAC_CHANNEL_B]);
+        dac8568_set_channel(2, values_[DAC_CHANNEL_C]);
+        dac8568_set_channel(3, values_[DAC_CHANNEL_D]);
+        // TODO, other 4 channels....
+      } else {
+    #endif
+        set8565_CHA(values_[DAC_CHANNEL_A]);
+        set8565_CHB(values_[DAC_CHANNEL_B]);
+        set8565_CHC(values_[DAC_CHANNEL_C]);
+        set8565_CHD(values_[DAC_CHANNEL_D]);
+    #if defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41)
+      }
+    #endif
 
     size_t tail = history_tail_;
     history_[DAC_CHANNEL_A][tail] = values_[DAC_CHANNEL_A];

@@ -31,6 +31,7 @@
 #include "util/util_misc.h"
 #include "util/util_settings.h"
 #include "OC_DAC.h"
+#include "OC_chords.h"
 
 namespace OC {
 
@@ -144,27 +145,9 @@ private:
   int screen_line_;
 };
 
-inline void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, int min_value, int max_value) {
-  const uint8_t *src = OC::bitmap_edit_indicators_8;
-  if (value == max_value)
-    src += OC::kBitmapEditIndicatorW * 2;
-  else if (value == min_value)
-    src += OC::kBitmapEditIndicatorW;
+void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, int min_value, int max_value);
+void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, const settings::value_attr &attr);
 
-  graphics.drawBitmap8(x - 5, y + 1, OC::kBitmapEditIndicatorW, src);
-}
-
-inline void DrawEditIcon(weegfx::coord_t x, weegfx::coord_t y, int value, const settings::value_attr &attr) {
-  const uint8_t *src = OC::bitmap_edit_indicators_8;
-  if (value == attr.max_)
-    src += OC::kBitmapEditIndicatorW * 2;
-  else if (value == attr.min_)
-    src += OC::kBitmapEditIndicatorW;
-
-  graphics.drawBitmap8(x - 5, y + 1, OC::kBitmapEditIndicatorW, src);
-}
-
-/* Removed jej 8/26/2018
 inline void DrawChord(weegfx::coord_t x, weegfx::coord_t y, int width, int value, int mem_offset) {
   
    OC::Chord *active_chord = &OC::user_chords[value + mem_offset * OC::Chords::NUM_CHORDS];
@@ -190,7 +173,7 @@ inline void DrawChord(weegfx::coord_t x, weegfx::coord_t y, int width, int value
    y_pos = y + OC::voicing[_voicing][3] * 16;
    CONSTRAIN(y_pos, 8, 64);
    graphics.drawFrame(x, y_pos, width, width);
-}*/
+}
 
 inline void DrawMiniChord(weegfx::coord_t x, weegfx::coord_t y, uint8_t count, uint8_t indicator) {
   int8_t _x = x - count * 3 - 4;

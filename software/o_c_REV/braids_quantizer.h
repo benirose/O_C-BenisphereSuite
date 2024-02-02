@@ -94,6 +94,6 @@ class Quantizer {
   DISALLOW_COPY_AND_ASSIGN(Quantizer);
 };
 
-}  // namespace stages
+}  // namespace braids
 
 #endif

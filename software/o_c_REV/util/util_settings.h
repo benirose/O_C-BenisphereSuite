@@ -144,8 +144,9 @@ public:
     return (size_t)(read_ptr - static_cast<const uint8_t *>(storage));
   }
 
-  static size_t storageSize() {
-    return storage_size_;
+  static constexpr size_t storageSize() {
+    return calc_storage_size();
+    //return storage_size_;
   }
 
 protected:
@@ -154,7 +155,7 @@ protected:
 
   int values_[num_settings];
   static const settings::value_attr value_attr_[];
-  static const size_t storage_size_;
+  //static constexpr size_t storage_size_;
 
   mutable uint16_t nibbles_;
 
@@ -207,7 +208,7 @@ protected:
     return reinterpret_cast<const uint8_t *>(storage);
   }
 
-  static size_t calc_storage_size() {
+  static constexpr size_t calc_storage_size() {
     size_t s = 0;
     unsigned nibbles = 0;
     for (auto attr : value_attr_) {
@@ -233,8 +234,7 @@ protected:
 };
 
 #define SETTINGS_DECLARE(clazz, last) \
-template <> const size_t settings::SettingsBase<clazz, last>::storage_size_ = settings::SettingsBase<clazz, last>::calc_storage_size(); \
-template <> const settings::value_attr settings::SettingsBase<clazz, last>::value_attr_[] =
+template <> constexpr settings::value_attr settings::SettingsBase<clazz, last>::value_attr_[] =
 
 }; // namespace settings
 

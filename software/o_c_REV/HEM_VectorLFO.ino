@@ -28,7 +28,7 @@ public:
         return "VectorLFO";
     }
 
-    static constexpr int min_freq = 3;
+    static constexpr int min_freq = 8;
     static constexpr int max_freq = 100000;
 
     void Start() {
@@ -43,17 +43,13 @@ public:
 
     void Controller() {
         // Input 1 is frequency modulation for channel 1
-        if (Changed(0)) {
-            int mod = Proportion(DetentedIn(0), HEMISPHERE_3V_CV, 3000);
-            mod = constrain(mod, -3000, 3000);
-            if (mod + freq[0] > 10) osc[0].SetFrequency(freq[0] + mod);
-        }
+        int freq_mod = Proportion(DetentedIn(0), HEMISPHERE_3V_CV, 3000);
+        freq_mod = constrain(freq[0] + freq_mod, min_freq, max_freq);
+        osc[0].SetFrequency(freq_mod);
 
-        // Input 2 determines signal 1's attenuation on the B/D output mix; at 0V, signal 1
-        // accounts for 50% of the B/D output. At 5V, signal 1 accounts for none of the
-        // B/D output.
-        int atten1 = DetentedIn(1);
-        atten1 = constrain(atten1, 0, HEMISPHERE_MAX_CV);
+        // Input 2 determines signal 1's level on the B/D output mix
+        int mix_level = DetentedIn(1);
+        mix_level = constrain(mix_level, -HEMISPHERE_MAX_CV, HEMISPHERE_MAX_CV);
 
         int signal = 0; // Declared here because the first channel's output is used in the second channel; see below
         ForEachChannel(ch)
@@ -61,9 +57,8 @@ public:
             if (Clock(ch)) {
                 uint32_t ticks = ClockCycleTicks(ch);
                 int new_freq = 1666666 / ticks;
-                new_freq = constrain(new_freq, min_freq, max_freq);
-                osc[ch].SetFrequency(new_freq);
-                freq[ch] = new_freq;
+                freq[ch] = constrain(new_freq, min_freq, max_freq);
+                osc[ch].SetFrequency(freq[ch]);
                 osc[ch].Reset();
             }
 
@@ -71,31 +66,33 @@ public:
                 // Out A is always just the first oscillator at full amplitude
                 signal = osc[ch].Next();
             } else {
-                // Out B can have channel 1 blended into it, depending on the value of atten1. At a value
-                // of 0, Out B is a 50/50 mix of channels 1 and 2. At a value of 5V, channel 1 is absent
-                // from Out B.
-                signal = Proportion(HEMISPHERE_MAX_CV - atten1, HEMISPHERE_MAX_CV, signal); // signal from channel 1's iteration
+                // Out B can have channel 1 blended into it, depending on the value of mix_level.
+                // At a value of 6V, Out B is a 50/50 mix of channels 1 and 2.
+                // At a value of 0V, channel 1 is absent from Out B.
+                signal = Proportion(mix_level, HEMISPHERE_MAX_CV, signal); // signal from channel 1's iteration
                 signal += osc[ch].Next();
 
-                // Proportionally blend the signal, depending on attenuation. If atten1 is 0, then this
-                // effectively divides the signal by 2. If atten1 is 5V, then the channel 2 signal will be
-                // output at full amplitude.
-                signal = Proportion(HEMISPHERE_MAX_CV, HEMISPHERE_MAX_CV + (HEMISPHERE_MAX_CV - atten1), signal);
+                // Proportionally blend the signal, depending on mix.
+                // If mix_level is at (+ or -) max, then this effectively divides the signal by 2.
+                signal = Proportion(HEMISPHERE_MAX_CV, HEMISPHERE_MAX_CV + abs(mix_level), signal);
             }
             Out(ch, signal);
         }
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawInterface();
     }
 
     void OnButtonPress() {
-        if (++cursor > 3) cursor = 0;
+        CursorAction(cursor, 3);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 3);
+            return;
+        }
         byte c = cursor;
         byte ch = cursor < 2 ? 0 : 1;
         if (ch) c -= 2;
@@ -132,10 +129,10 @@ public:
           if (freq[i] > 250) exponent++;
           if (freq[i] > 1000) exponent++;
           if (freq[i] > 10000) exponent++;
-          Pack(data, PackLocation {12 + i * 10, 2}, exponent);
+          Pack(data, PackLocation {uint8_t(12 + i * 10), 2}, exponent);
 
           int mantissa = freq[i] / pow10_lut[exponent];
-          Pack(data, PackLocation {12 + i * 10 + 2, 8}, mantissa);
+          Pack(data, PackLocation {uint8_t(12 + i * 10 + 2), 8}, mantissa);
         }
         
         return data;
@@ -143,8 +140,8 @@ public:
     
     void OnDataReceive(uint64_t data) {
         for (int i = 0; i < 2; ++i) {
-          int exponent = Unpack(data, PackLocation {12 + i * 10, 2});
-          int mantissa = Unpack(data, PackLocation {12 + i * 10 + 2, 8});
+          int exponent = Unpack(data, PackLocation {uint8_t(12 + i * 10), 2});
+          int mantissa = Unpack(data, PackLocation {uint8_t(12 + i * 10 + 2), 8});
           
           freq[i] = mantissa * pow10_lut[exponent];
         }
@@ -156,7 +153,7 @@ protected:
     void SetHelp() {
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "1,2=Sync";
-        help[HEMISPHERE_HELP_CVS]      = "1=Freq1 2=Atten1@B";
+        help[HEMISPHERE_HELP_CVS]      = "1=Freq1  2=Mix 1@B";
         help[HEMISPHERE_HELP_OUTS]     = "Out A=1, B=2+1";
         help[HEMISPHERE_HELP_ENCODER]  = "Freq./Waveform";
         //                               "------------------" <-- Size Guide
@@ -194,7 +191,7 @@ private:
         DrawWaveform(ch);
 
         if (c == 0) gfxCursor(8, 23, 55);
-        if (c == 1 && CursorBlink()) gfxFrame(0, 24, 63, 40);
+        if (c == 1 && (EditMode() || CursorBlink()) ) gfxFrame(0, 24, 63, 40);
     }
 
     void DrawWaveform(byte ch) {

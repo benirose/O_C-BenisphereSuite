@@ -19,44 +19,7 @@
 // SOFTWARE.
 
 #include "HSApplication.h"
-
-// Bitmap representation of QR code for access to http://www.beigemaze.com/hs, which
-// redirects to Hemisphere Suite documentation.
-//
-// And no, the QR code doesn't seem to work. I'm sure that the pixels are too small,
-// and that the dark spots are too illuminated by adjacent pixels, or whatever.
-// But I'm leaving this in because with the right phone and the right display, who
-// knows?
-// Ah, the heck with it. Commenting it out.
-/*
-const uint32_t QR[25] = {
-        0x1fdeb7f,
-        0x1042d41,
-        0x174455d,
-        0x174f75d,
-        0x174ad5d,
-        0x105c441,
-        0x1fd557f,
-        0x8500,
-        0x1f6536a,
-        0x9cb1b8,
-        0x9356cb,
-        0x13b29a0,
-        0x131cb6d,
-        0x1757138,
-        0x1d94d5c,
-        0x92d5a6,
-        0x9f6ef7,
-        0x314f00,
-        0xb5147f,
-        0x1f1ff41,
-        0x1bf545d,
-        0x19ee55d,
-        0x177105d,
-        0x12c7741,
-        0x1e4dc7f
-};
-*/
+#include "OC_strings.h"
 
 class Settings : public HSApplication {
 public:
@@ -67,64 +30,51 @@ public:
 	}
 
     void Controller() {
+    #ifdef PEWPEWPEW
+        HS::frame.Load();PewPewTime.PEWPEW(Clock(3)<<1|Clock(0));}
+        struct{bool go=0;int idx=0;struct{uint8_t x,y;int x_v,y_v;}pewpews[8];
+        void PEWPEW(uint8_t mask){uint32_t t=OC::CORE::ticks;for(int i=0;i<8;++i){auto &p=pewpews[i];
+          if(mask>>i&0x01){auto &pp=pewpews[idx++];pp.x=0+120*i;pp.y=55;pp.x_v=(6+random(3))*(i?-1:1);pp.y_v=-9;idx%=8;}
+          if(t%500==0){p.x+=p.x_v;p.y+=p.y_v;if(p.y>=55&&p.y_v>0)p.y_v=-p.y_v;else ++p.y_v;}
+          if(t%10000==0){p.x_v=p.x_v*100/101;p.y_v=p.y_v*10/11;}}}}PewPewTime;
+        void PEWPEW(){for(int i=0;i<8;++i){auto &p=PewPewTime.pewpews[i];gfxIcon(p.x%128,p.y%64,ZAP_ICON);}
+    #endif
     }
 
     void View() {
         gfxHeader("Setup / About");
-        gfxPrint(0, 15, "Benisphere Suite");
-        gfxPrint(0, 25, OC_VERSION);
-        gfxPrint(0, 35, "github.com/benirose");
+
+        #if defined(ARDUINO_TEENSY40)
+        gfxPrint(100, 0, "T4.0");
+        //gfxPrint(0, 45, "E2END="); gfxPrint(E2END);
+        #elif defined(ARDUINO_TEENSY41)
+        gfxPrint(100, 0, "T4.1");
+        #else
+        gfxPrint(100, 0, "T3.2");
+        #endif
+
+        gfxIcon(0, 15, ZAP_ICON);
+        gfxIcon(120, 15, ZAP_ICON);
+        #ifdef PEWPEWPEW
+        gfxPrint(21, 15, "PEW! PEW! PEW!");
+        #else
+        gfxPrint(12, 15, "Phazerville Suite");
+        #endif
+        gfxPrint(0, 25, OC::Strings::VERSION);
+        gfxPrint(0, 35, "github.com/djphazer");
         gfxPrint(0, 55, "[CALIBRATE]   [RESET]");
-
-#ifdef BUCHLA_4U
-        gfxPrint(60, 25, "Buchla");
-#endif
-
-        //DrawQRAt(103, 15);
     }
 
     /////////////////////////////////////////////////////////////////
     // Control handlers
     /////////////////////////////////////////////////////////////////
-    void OnLeftButtonPress() {
+    void Calibration() {
         OC::ui.Calibrate();
     }
 
-    void OnLeftButtonLongPress() {
-    }
-
-    void OnRightButtonPress() {
+    void FactoryReset() {
         OC::apps::Init(1);
     }
-
-    void OnUpButtonPress() {
-    }
-
-    void OnDownButtonPress() {
-    }
-
-    void OnDownButtonLongPress() {
-    }
-
-    void OnLeftEncoderMove(int direction) {
-    }
-
-    void OnRightEncoderMove(int direction) {
-    }
-
-private:
-/*
-    void DrawQRAt(byte x, byte y) {
-        for (byte c = 0; c < 25; c++) // Column
-        {
-            uint32_t col = QR[c];
-            for (byte b = 0; b < 25; b++) // Bit
-            {
-                if (col & (1 << b)) gfxPixel(x + c, y + b);
-            }
-        }
-    }
-*/
 
 };
 
@@ -136,12 +86,16 @@ void Settings_init() {
 }
 
 // Not using O_C Storage
-size_t Settings_storageSize() {return 0;}
+constexpr size_t Settings_storageSize() {return 0;}
 size_t Settings_save(void *storage) {return 0;}
 size_t Settings_restore(const void *storage) {return 0;}
 
 void Settings_isr() {
-	return Settings_instance.BaseController();
+#ifdef PEWPEWPEW
+  Settings_instance.Controller();
+#endif
+// skip the Controller to avoid I/O conflict with Calibration
+  return;
 }
 
 void Settings_handleAppEvent(OC::AppEvent event) {
@@ -156,32 +110,27 @@ void Settings_menu() {
     Settings_instance.BaseView();
 }
 
-void Settings_screensaver() {} // Deprecated
+void Settings_screensaver() {
+#ifdef PEWPEWPEW
+    Settings_instance.PEWPEW();
+#endif
+}
 
 void Settings_handleButtonEvent(const UI::Event &event) {
-    // For left encoder, handle press and long press
     if (event.control == OC::CONTROL_BUTTON_L) {
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) Settings_instance.OnLeftButtonLongPress();
-        else Settings_instance.OnLeftButtonPress();
+        if (event.type == UI::EVENT_BUTTON_PRESS) Settings_instance.Calibration();
     }
 
-    // For right encoder, only handle press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) Settings_instance.OnRightButtonPress();
-
-    // For up button, handle only press (long press is reserved)
-    if (event.control == OC::CONTROL_BUTTON_UP) Settings_instance.OnUpButtonPress();
-
-    // For down button, handle press and long press
-    if (event.control == OC::CONTROL_BUTTON_DOWN) {
-        if (event.type == UI::EVENT_BUTTON_PRESS) Settings_instance.OnDownButtonPress();
-        if (event.type == UI::EVENT_BUTTON_LONG_PRESS) Settings_instance.OnDownButtonLongPress();
-    }
+    if (event.control == OC::CONTROL_BUTTON_R && event.type == UI::EVENT_BUTTON_PRESS) Settings_instance.FactoryReset();
 }
 
 void Settings_handleEncoderEvent(const UI::Event &event) {
+    (void)event;
+    /*
     // Left encoder turned
     if (event.control == OC::CONTROL_ENCODER_L) Settings_instance.OnLeftEncoderMove(event.value);
 
     // Right encoder turned
     if (event.control == OC::CONTROL_ENCODER_R) Settings_instance.OnRightEncoderMove(event.value);
+    */
 }

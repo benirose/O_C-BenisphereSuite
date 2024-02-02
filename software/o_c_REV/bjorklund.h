@@ -45,10 +45,10 @@
 inline uint32_t rotl32(uint32_t input, unsigned int length, unsigned int count) __attribute__((always_inline));
 inline uint32_t rotl32(uint32_t input, unsigned int length, unsigned int count) {
   input &= ~(0xffffffff << length);
-  return (input << count) | (input >> (length - count + 1)); // off-by-ones or parenthesis mismatch likely
+  return (input << count) | (input >> (length - count)); // off-by-ones or parenthesis mismatch likely
 }
 
 bool EuclideanFilter(uint8_t num_steps, uint8_t num_beats, uint8_t rotation, uint32_t clock);
-uint32_t EuclideanPattern(uint8_t num_steps, uint8_t num_beats, uint8_t rotation);
+uint32_t EuclideanPattern(uint8_t num_steps, uint8_t num_beats, uint8_t rotation, uint8_t padding = 0);
 
 #endif // BJORKLUND_H_

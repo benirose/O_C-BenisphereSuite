@@ -26,6 +26,8 @@
 #include "OC_FreqMeasure.h"
 #include "OC_FreqMeasureCapture.h"
 
+#if defined(__MK20DX256__)
+
 #define FREQMEASURE_BUFFER_LEN 12
 static volatile uint32_t buffer_value[FREQMEASURE_BUFFER_LEN];
 static volatile uint8_t buffer_head;
@@ -118,6 +120,37 @@ void FTM_ISR_NAME (void)
 		}
 	}
 }
+
+#elif defined(__IMXRT1062__)
+void FreqMeasureClass::begin(void)
+{
+	// TODO Teensy 4.1
+}
+
+uint8_t FreqMeasureClass::available(void)
+{
+	// TODO Teensy 4.1
+	return 0;
+}
+
+uint32_t FreqMeasureClass::read(void)
+{
+	// TODO Teensy 4.1
+	return 0;
+}
+
+float FreqMeasureClass::countToFrequency(uint32_t count)
+{
+	// TODO Teensy 4.1
+	return 0.0f;
+}
+
+void FreqMeasureClass::end(void)
+{
+	// TODO Teensy 4.1
+}
+
+#endif // __IMXRT1062__
 
 FreqMeasureClass FreqMeasure;
 

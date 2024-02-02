@@ -638,10 +638,10 @@ private:
             int data2 = usbMIDI.getData2();
 
             // Handle system exclusive dump for Setup data
-            if (message == MIDI_MSG_SYSEX) OnReceiveSysEx();
+            if (message == HEM_MIDI_SYSEX) OnReceiveSysEx();
 
             // Listen for incoming clock
-            if (message == MIDI_MSG_REALTIME && data1 == 0) {
+            if (message == HEM_MIDI_CLOCK) {
                 if (++clock_count >= 24) clock_count = 0;
             }
 
@@ -655,7 +655,7 @@ private:
                 int in_fn = get_in_assign(ch);
                 int in_ch = get_in_channel(ch);
                 bool indicator = 0;
-                if (message == MIDI_MSG_NOTE_ON && in_ch == channel) {
+                if (message == HEM_MIDI_NOTE_ON && in_ch == channel) {
                     if (note_in[ch] == -1) { // If this channel isn't already occupied with another note, handle Note On
                         if (in_fn == MIDI_IN_NOTE && !note_captured) {
                             // Send quantized pitch CV. Isolate transposition to quantizer so that it notes off aren't
@@ -694,7 +694,7 @@ private:
                     }
                 }
 
-                if (message == MIDI_MSG_NOTE_OFF && in_ch == channel) {
+                if (message == HEM_MIDI_NOTE_OFF && in_ch == channel) {
                     if (note_in[ch] == data1) { // If the note off matches the note on assingned to this output
                         note_in[ch] = -1;
                         if (in_fn == MIDI_IN_GATE) {
@@ -711,7 +711,7 @@ private:
                 }
 
                 bool cc = (in_fn == MIDI_IN_MOD || in_fn >= MIDI_IN_EXPRESSION);
-                if (cc && message == MIDI_MSG_MIDI_CC && in_ch == channel) {
+                if (cc && message == HEM_MIDI_CC && in_ch == channel) {
                     uint8_t cc = 1; // Modulation wheel
                     if (in_fn == MIDI_IN_EXPRESSION) cc = 11;
                     if (in_fn == MIDI_IN_PAN) cc = 10;
@@ -728,14 +728,14 @@ private:
                     }
                 }
 
-                if (message == MIDI_MSG_AFTERTOUCH && in_fn == MIDI_IN_AFTERTOUCH && in_ch == channel) {
+                if (message == HEM_MIDI_AFTERTOUCH && in_fn == MIDI_IN_AFTERTOUCH && in_ch == channel) {
                     // Send aftertouch to CV
-                    Out(ch, Proportion(data2, 127, HSAPPLICATION_5V));
+                    Out(ch, Proportion(data1, 127, HSAPPLICATION_5V));
                     UpdateLog(1, ch, 3, in_ch, data1, data2);
                     indicator = 1;
                 }
 
-                if (message == MIDI_MSG_PITCHBEND && in_fn == MIDI_IN_PITCHBEND && in_ch == channel) {
+                if (message == HEM_MIDI_PITCHBEND && in_fn == MIDI_IN_PITCHBEND && in_ch == channel) {
                     // Send pitch bend to CV
                     int data = (data2 << 7) + data1 - 8192;
                     Out(ch, Proportion(data, 0x7fff, HSAPPLICATION_3V));
@@ -830,6 +830,7 @@ private:
     }
 };
 
+// TOTAL EEPROM SIZE: 40*4 + 1 == 161 bytes
 SETTINGS_DECLARE(CaptainMIDI, MIDI_SETTING_LAST) {
     MIDI_SETUP_PARAMETER_LIST
     MIDI_SETUP_PARAMETER_LIST
@@ -847,7 +848,7 @@ void MIDI_init() {
     captain_midi_instance.Start();
 }
 
-size_t MIDI_storageSize() {
+constexpr size_t MIDI_storageSize() {
     return CaptainMIDI::storageSize();
 }
 
@@ -884,10 +885,11 @@ void MIDI_handleButtonEvent(const UI::Event &event) {
         captain_midi_instance.ToggleCursor();
     if (event.control == OC::CONTROL_BUTTON_L) {
         if (event.type == UI::EVENT_BUTTON_LONG_PRESS) captain_midi_instance.Panic();
-        else captain_midi_instance.ToggleDisplay();
+        if (event.type == UI::EVENT_BUTTON_PRESS) captain_midi_instance.ToggleDisplay();
     }
 
-    if (event.control == OC::CONTROL_BUTTON_UP) captain_midi_instance.SwitchSetup(1);
+    if (event.control == OC::CONTROL_BUTTON_UP && event.type == UI::EVENT_BUTTON_PRESS)
+        captain_midi_instance.SwitchSetup(1);
     if (event.control == OC::CONTROL_BUTTON_DOWN) {
         if (event.type == UI::EVENT_BUTTON_PRESS) captain_midi_instance.SwitchSetup(-1);
         if (event.type == UI::EVENT_BUTTON_LONG_PRESS) captain_midi_instance.ToggleCopyMode();

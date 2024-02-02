@@ -25,6 +25,8 @@
  * for consistency in development, or ease of porting apps or applets in either direction.
  */
 
+#pragma once
+
 #ifndef int2simfloat
 #define int2simfloat(x) (x << 14)
 #define simfloat2int(x) (x >> 14)
@@ -32,20 +34,22 @@ typedef int32_t simfloat;
 #endif
 
 #include "HSicons.h"
-
-#ifndef HSAPPLICATION_H_
-#define HSAPPLICATION_H_
+#include "HSClockManager.h"
+#include "HemisphereApplet.h"
+#include "HSUtils.h"
 
 #define HSAPPLICATION_CURSOR_TICKS 12000
 #define HSAPPLICATION_5V 7680
 #define HSAPPLICATION_3V 4608
 #define HSAPPLICATION_CHANGE_THRESHOLD 32
 
-#ifdef BUCHLA_4U
-#define PULSE_VOLTAGE 8
+#if defined(BUCHLA_4U) || defined(VOR)
+#define HSAPP_PULSE_VOLTAGE 8
 #else
-#define PULSE_VOLTAGE 5
+#define HSAPP_PULSE_VOLTAGE 5
 #endif
+
+using namespace HS;
 
 class HSApplication {
 public:
@@ -55,32 +59,27 @@ public:
     virtual void Resume();
 
     void BaseController() {
-        for (uint8_t ch = 0; ch < 4; ch++)
-        {
-            // Set ADC input values
-            inputs[ch] = OC::ADC::raw_pitch_value((ADC_CHANNEL)ch);
-            if (abs(inputs[ch] - last_cv[ch]) > HSAPPLICATION_CHANGE_THRESHOLD) {
-                changed_cv[ch] = 1;
-                last_cv[ch] = inputs[ch];
-            } else changed_cv[ch] = 0;
-
-            if (clock_countdown[ch] > 0) {
-                if (--clock_countdown[ch] == 0) Out(ch, 0);
-            }
-        }
+        // Load the IO frame from CV inputs
+        HS::frame.Load();
 
         // Cursor countdowns. See CursorBlink(), ResetCursor(), gfxCursor()
         if (--cursor_countdown < -HSAPPLICATION_CURSOR_TICKS) cursor_countdown = HSAPPLICATION_CURSOR_TICKS;
 
         Controller();
+
+        // set outputs from IO frame
+        HS::frame.Send();
     }
 
     void BaseStart() {
         // Initialize some things for startup
         for (uint8_t ch = 0; ch < 4; ch++)
         {
-            clock_countdown[ch]  = 0;
-            adc_lag_countdown[ch] = 0;
+            frame.clock_countdown[ch]  = 0;
+            frame.inputs[ch] = 0;
+            frame.outputs[ch] = 0;
+            frame.outputs_smooth[ch] = 0;
+            frame.adc_lag_countdown[ch] = 0;
         }
         cursor_countdown = HSAPPLICATION_CURSOR_TICKS;
 
@@ -92,21 +91,42 @@ public:
         last_view_tick = OC::CORE::ticks;
     }
 
-    int Proportion(int numerator, int denominator, int max_value) {
-        simfloat proportion = int2simfloat((int32_t)numerator) / (int32_t)denominator;
-        int scaled = simfloat2int(proportion * max_value);
-        return scaled;
+    // general screensaver view, visualizing inputs and outputs
+    void BaseScreensaver(bool notenames = 0) {
+        gfxDottedLine(0, 32, 127, 32, 3); // horizontal baseline
+        for (int ch = 0; ch < 4; ++ch)
+        {
+            if (notenames) {
+                // approximate notes being output
+                gfxPrint(8 + 32*ch, 55, midi_note_numbers[MIDIQuantizer::NoteNumber(HS::frame.outputs[ch])] );
+            }
+
+            // trigger/gate indicators
+            if (HS::frame.gate_high[ch]) gfxIcon(11 + 32*ch, 0, CLOCK_ICON);
+
+            // input
+            int height = ProportionCV(HS::frame.inputs[ch], 32);
+            int y = constrain(32 - height, 0, 32);
+            gfxFrame(3 + (32 * ch), y, 6, abs(height));
+
+            // output
+            height = ProportionCV(HS::frame.outputs[ch], 32);
+            y = constrain(32 - height, 0, 32);
+            gfxInvert(11 + (32 * ch), y, 12, abs(height));
+
+            gfxDottedLine(32 * ch, 0, 32*ch, 63, 3); // vertical divider, left side
+        }
+        gfxDottedLine(127, 0, 127, 63, 3); // vertical line, right side
     }
 
     //////////////// Hemisphere-like IO methods
     ////////////////////////////////////////////////////////////////////////////////
     void Out(int ch, int value, int octave = 0) {
-        OC::DAC::set_pitch((DAC_CHANNEL)ch, value, octave);
-        outputs[ch] = value + (octave * (12 << 7));
+        frame.Out( (DAC_CHANNEL)(ch), value + (octave * (12 << 7)));
     }
 
     int In(int ch) {
-        return inputs[ch];
+        return frame.inputs[ch];
     }
 
     // Apply small center detent to input, so it reads zero before a threshold
@@ -114,45 +134,53 @@ public:
         return (In(ch) > 64 || In(ch) < -64) ? In(ch) : 0;
     }
 
+    // Standard bi-polar CV modulation scenario
+    template <typename T>
+    void Modulate(T &param, const int ch, const int min = 0, const int max = 255) {
+        int cv = DetentedIn(ch);
+        param = constrain(param + Proportion(cv, HEMISPHERE_MAX_INPUT_CV, max), min, max);
+    }
+
     bool Changed(int ch) {
-        return changed_cv[ch];
+        return frame.changed_cv[ch];
     }
 
     bool Gate(int ch) {
-        bool high = 0;
-        if (ch == 0) high = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_1>();
-        if (ch == 1) high = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_2>();
-        if (ch == 2) high = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_3>();
-        if (ch == 3) high = OC::DigitalInputs::read_immediate<OC::DIGITAL_INPUT_4>();
-        return high;
+        return frame.gate_high[ch];
     }
 
     void GateOut(int ch, bool high) {
-        Out(ch, 0, (high ? PULSE_VOLTAGE : 0));
+        Out(ch, 0, (high ? HSAPP_PULSE_VOLTAGE : 0));
     }
 
     bool Clock(int ch) {
         bool clocked = 0;
-        if (ch == 0) clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_1>();
-        if (ch == 1) clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_2>();
-        if (ch == 2) clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_3>();
-        if (ch == 3) clocked = OC::DigitalInputs::clocked<OC::DIGITAL_INPUT_4>();
+        ClockManager *clock_m = clock_m->get();
+
+        if (clock_m->IsRunning() && clock_m->GetMultiply(ch) != 0)
+            clocked = clock_m->Tock(ch);
+        else {
+            clocked = frame.clocked[ch];
+        }
+
+        // manual triggers
+        clocked = clocked || clock_m->Beep(ch);
+
         if (clocked) {
-        		cycle_ticks[ch] = OC::CORE::ticks - last_clock[ch];
-        		last_clock[ch] = OC::CORE::ticks;
+            frame.cycle_ticks[ch] = OC::CORE::ticks - frame.last_clock[ch];
+            frame.last_clock[ch] = OC::CORE::ticks;
         }
         return clocked;
     }
 
     void ClockOut(int ch, int ticks = 100) {
-        clock_countdown[ch] = ticks;
-        Out(ch, 0, PULSE_VOLTAGE);
+        frame.ClockOut( (DAC_CHANNEL)ch, ticks );
     }
 
     // Buffered I/O functions for use in Views
-    int ViewIn(int ch) {return inputs[ch];}
-    int ViewOut(int ch) {return outputs[ch];}
-    int ClockCycleTicks(int ch) {return cycle_ticks[ch];}
+    int ViewIn(int ch) {return frame.inputs[ch];}
+    int ViewOut(int ch) {return frame.outputs[ch];}
+    int ClockCycleTicks(int ch) {return frame.cycle_ticks[ch];}
 
     /* ADC Lag: There is a small delay between when a digital input can be read and when an ADC can be
      * read. The ADC value lags behind a bit in time. So StartADCLag() and EndADCLag() are used to
@@ -165,95 +193,12 @@ public:
      *     // etc...
      * }
      */
-    void StartADCLag(int ch) {adc_lag_countdown[ch] = 96;}
-    bool EndOfADCLag(int ch) {return (--adc_lag_countdown[ch] == 0);}
+    void StartADCLag(int ch) {frame.adc_lag_countdown[ch] = 96;}
+    bool EndOfADCLag(int ch) {return (--frame.adc_lag_countdown[ch] == 0);}
 
-    //////////////// Hemisphere-like graphics methods for easy porting
-    ////////////////////////////////////////////////////////////////////////////////
     void gfxCursor(int x, int y, int w) {
         if (CursorBlink()) gfxLine(x, y, x + w - 1, y);
     }
-
-    void gfxPos(int x, int y) {
-        graphics.setPrintPos(x, y);
-    }
-
-    void gfxPrint(int x, int y, const char *str) {
-        graphics.setPrintPos(x, y);
-        graphics.print(str);
-    }
-
-    void gfxPrint(int x, int y, int num) {
-        graphics.setPrintPos(x, y);
-        graphics.print(num);
-    }
-
-    void gfxPrint(int x_adv, int num) { // Print number with character padding
-        for (int c = 0; c < (x_adv / 6); c++) gfxPrint(" ");
-        gfxPrint(num);
-    }
-
-    void gfxPrint(const char *str) {
-        graphics.print(str);
-    }
-
-    void gfxPrint(int num) {
-        graphics.print(num);
-    }
-
-    void gfxPixel(int x, int y) {
-        graphics.setPixel(x, y);
-    }
-
-    void gfxFrame(int x, int y, int w, int h) {
-        graphics.drawFrame(x, y, w, h);
-    }
-
-    void gfxRect(int x, int y, int w, int h) {
-        graphics.drawRect(x, y, w, h);
-    }
-
-    void gfxInvert(int x, int y, int w, int h) {
-        graphics.invertRect(x, y, w, h);
-    }
-
-    void gfxLine(int x, int y, int x2, int y2) {
-        graphics.drawLine(x, y, x2, y2);
-    }
-
-    void gfxDottedLine(int x, int y, int x2, int y2, uint8_t p = 2) {
-#ifdef HS_GFX_MOD
-        graphics.drawLine(x, y, x2, y2, p);
-#else
-        graphics.drawLine(x, y, x2, y2);
-#endif
-    }
-
-    void gfxCircle(int x, int y, int r) {
-        graphics.drawCircle(x, y, r);
-    }
-
-    void gfxBitmap(int x, int y, int w, const uint8_t *data) {
-        graphics.drawBitmap8(x, y, w, data);
-    }
-
-    // Like gfxBitmap, but always 8x8
-    void gfxIcon(int x, int y, const uint8_t *data) {
-        gfxBitmap(x, y, 8, data);
-    }
-
-
-    uint8_t pad(int range, int number) {
-        uint8_t padding = 0;
-        while (range > 1)
-        {
-            if (abs(number) < range) padding += 6;
-            range = range / 10;
-        }
-        if (number < 0 && padding > 0) padding -= 6; // Compensate for minus sign
-        return padding;
-    }
-
     void gfxHeader(const char *str) {
          gfxPrint(1, 2, str);
          gfxLine(0, 10, 127, 10);
@@ -265,22 +210,11 @@ protected:
     bool CursorBlink() {
         return (cursor_countdown > 0);
     }
-
     void ResetCursor() {
         cursor_countdown = HSAPPLICATION_CURSOR_TICKS;
     }
 
 private:
-    int clock_countdown[4]; // For clock output timing
-    int adc_lag_countdown[4]; // Lag countdown for each input channel
     int cursor_countdown; // Timer for cursor blinkin'
     uint32_t last_view_tick; // Time since the last view, for activating screen blanking
-    int inputs[4]; // Last ADC values
-    int outputs[4]; // Last DAC values; inputs[] and outputs[] are used to allow access to values in Views
-    bool changed_cv[4]; // Has the input changed by more than 1/8 semitone since the last read?
-    int last_cv[4]; // For change detection
-    uint32_t last_clock[4]; // Tick number of the last clock observed by the child class
-    uint32_t cycle_ticks[4]; // Number of ticks between last two clocks
 };
-
-#endif /* HSAPPLICATION_H_ */

@@ -5,6 +5,7 @@
 #include "OC_debug.h"
 #include "OC_menus.h"
 #include "OC_ui.h"
+#include "OC_strings.h"
 #include "util/util_misc.h"
 #include "extern/dspinst.h"
 
@@ -78,6 +79,26 @@ static void debug_menu_core() {
 #endif
 }
 
+static void debug_menu_version()
+{
+  graphics.setPrintPos(2, 12);
+  graphics.print(Strings::NAME);
+  graphics.setPrintPos(2, 22);
+  graphics.print(Strings::VERSION);
+
+  weegfx::coord_t y = 32;
+  graphics.setPrintPos(2, y); y += 10;
+#ifdef OC_DEV
+  graphics.print("DEV");
+#else
+  graphics.print("PROD");
+#endif
+#ifdef USB_SERIAL
+  graphics.setPrintPos(2, y); y += 10;
+  graphics.print("USB_SERIAL");
+#endif
+}
+
 static void debug_menu_gfx() {
   graphics.drawFrame(0, 0, 128, 64);
 
@@ -117,6 +138,7 @@ struct DebugMenu {
 
 static const DebugMenu debug_menus[] = {
   { " CORE", debug_menu_core },
+  { " VERS", debug_menu_version },
   { " GFX", debug_menu_gfx },
   { " ADC", debug_menu_adc },
 #ifdef POLYLFO_DEBUG  
@@ -159,9 +181,9 @@ void Ui::DebugStats() {
 
     while (event_queue_.available()) {
       UI::Event event = event_queue_.PullEvent();
-      if (CONTROL_BUTTON_R == event.control) {
+      if (CONTROL_BUTTON_R == event.control && UI::EVENT_BUTTON_PRESS == event.type) {
         exit_loop = true;
-      } else if (CONTROL_BUTTON_L == event.control) {
+      } else if (CONTROL_BUTTON_L == event.control && UI::EVENT_BUTTON_PRESS == event.type) {
         ++current_menu;
         if (!current_menu->title || !current_menu->display_fn)
           current_menu = &debug_menus[0];

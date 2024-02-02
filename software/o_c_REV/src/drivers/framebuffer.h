@@ -27,6 +27,8 @@ public:
     for (size_t f = 0; f < frames; ++f)
       frame_buffers_[f] = frame_memory_ + kFrameSize * f;
     write_ptr_ = read_ptr_ = 0;
+    capture_on_next_write = false;
+    capture_is_valid = false;
   }
 
   size_t writeable() const {
@@ -52,16 +54,34 @@ public:
   }
 
   void written() {
+    if (capture_on_next_write) {
+      capture_on_next_write = false;
+      memcpy(capture_memory_, frame_buffers_[write_ptr_ % frames], kFrameSize);
+      capture_is_valid = true;
+    }
     ++write_ptr_;
+  }
+
+  void capture_request() {
+    capture_on_next_write = true;
+  }
+  const uint8_t * captured() {
+    return (capture_is_valid) ? capture_memory_ : NULL;
+  }
+  void capture_retire() {
+    capture_is_valid = false;
   }
 
 private:
 
   uint8_t frame_memory_[kFrameSize * frames] __attribute__ ((aligned (4)));
+  uint8_t capture_memory_[kFrameSize] __attribute__ ((aligned (4)));
   uint8_t *frame_buffers_[frames];
 
   volatile size_t write_ptr_;
   volatile size_t read_ptr_;
+  volatile bool capture_on_next_write;
+  volatile bool capture_is_valid;
 
   DISALLOW_COPY_AND_ASSIGN(FrameBuffer);
 };

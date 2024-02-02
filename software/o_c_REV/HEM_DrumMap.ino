@@ -20,14 +20,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#ifdef DRUMMAP_GRIDS2
+#include "grids2_resources.h"
+#else
 #include "grids_resources.h"
+#endif
 
-#define HEM_DRUMMAP_PULSE_ANIMATION_TICKS 500
+#define HEM_DRUMMAP_PULSE_ANIMATION_TICKS 1000
 #define HEM_DRUMMAP_VALUE_ANIMATION_TICKS 16000
 #define HEM_DRUMMAP_AUTO_RESET_TICKS 30000
 
 class DrumMap : public HemisphereApplet {
 public:
+
+    static constexpr int MAX_VAL = 255;
 
     const char* applet_name() {
         return "DrumMap";
@@ -39,30 +45,30 @@ public:
     }
 
     void Controller() {
-        cv1 = Proportion(DetentedIn(0), HEMISPHERE_MAX_CV, 255);
-        cv2 = Proportion(DetentedIn(1), HEMISPHERE_MAX_CV, 255);
+        _fill[0] = fill[0];
+        _fill[1] = fill[1];
+        _x = x;
+        _y = y;
+        _chaos = chaos;
 
-        int _fill[2] = {fill[0], fill[1]};
-        if (cv_mode == 0) {
-          _fill[0] = constrain(_fill[0]+cv1, 0, 255);
-          _fill[1] = constrain(_fill[1]+cv2, 0, 255);
+        switch (cv_mode) {
+        case 0:
+          Modulate(_fill[0], 0, 0, MAX_VAL);
+          Modulate(_fill[1], 1, 0, MAX_VAL);
+          break;
+
+        case 1:
+          Modulate(_x, 0, 0, MAX_VAL);
+          Modulate(_y, 1, 0, MAX_VAL);
+          break;
+
+        case 2:
+          Modulate(_fill[0], 0, 0, MAX_VAL);
+          Modulate(_chaos, 1, 0, MAX_VAL);
+          break;
         }
 
-        int _x = x;
-        int _y = y;
-        if (cv_mode == 1) {
-          _x = constrain(_x+cv1, 0, 255);
-          _y = constrain(_y+cv2, 0, 255);
-        }
-
-        int _chaos = chaos;
-        if (cv_mode == 2) {
-          _fill[0] = constrain(_fill[0]+cv1, 0, 255);
-          _chaos = constrain(_chaos+cv2, 0, 255);
-        }
-        
-
-        if (Clock(1)) Reset(); // Reset
+        if (Clock(1)) Reset();
 
         if (Clock(0)) {
             // generate randomness for each drum type on first step of the pattern
@@ -76,7 +82,7 @@ public:
                 // accent on ch 1 will be for whatever part ch 0 is set to
                 uint8_t part = (ch == 1 && mode[ch] == 3) ? mode[0] : mode[ch];
                 int level = ReadDrumMap(step, part, _x, _y);
-                level = constrain(level + randomness[part], 0, 255);
+                level = constrain(level + randomness[part], 0, MAX_VAL);
                 // use ch 0 fill if ch 1 is in accent mode
                 uint8_t threshold = (ch == 1 && mode[ch] == 3) ? ~_fill[0] : ~_fill[ch];
                 if (level > threshold) {
@@ -123,41 +129,61 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawInterface();
     }
 
     void OnButtonPress() {
-        if (++cursor > 7) cursor = 0;
-        if (mode[1] > 2 && cursor == 3) cursor = 4;
+        CursorAction(cursor, 7);
+        if (mode[1] > 2 && cursor == 3) ++cursor;
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            do {
+                MoveCursor(cursor, direction, 7);
+            } while (mode[1] > 2 && cursor == 3);
+
+            ResetCursor();
+            return;
+        }
+
         int accel = knob_accel >> 8;
         // modes
-        if (cursor == 0) {
+        switch (cursor) {
+        case 0:
             mode[0] += direction;
             if (mode[0] > 2) mode[0] = 0;
             if (mode[0] < 0) mode[0] = 2;
-        }
-        if (cursor == 1) {
+            break;
+        case 1:
             mode[1] += direction;
             if (mode[1] > 3) mode[1] = 0;
             if (mode[1] < 0) mode[1] = 3;
-        }
+            break;
         // fill
-        if (cursor == 2) fill[0] = constrain(fill[0] += (direction * accel), 0, 255);
-        if (cursor == 3) fill[1] = constrain(fill[1] += (direction * accel), 0, 255);
+        case 2:
+            fill[0] = constrain(fill[0] + (direction * accel), 0, MAX_VAL);
+            break;
+        case 3:
+            fill[1] = constrain(fill[1] + (direction * accel), 0, MAX_VAL);
+            break;
         // x/y
-        if (cursor == 4) x = constrain(x += (direction * accel), 0, 255);
-        if (cursor == 5) y = constrain(y += (direction * accel), 0, 255);
+        case 4:
+            x = constrain(x + (direction * accel), 0, MAX_VAL);
+            break;
+        case 5:
+            y = constrain(y + (direction * accel), 0, MAX_VAL);
+            break;
         // chaos
-        if (cursor == 6) chaos = constrain(chaos += (direction * accel), 0, 255);
+        case 6:
+            chaos = constrain(chaos + (direction * accel), 0, MAX_VAL);
+            break;
         // cv assign
-        if (cursor == 7) {
-          cv_mode += direction;
-          if (cv_mode > 2) cv_mode = 0;
-          if (cv_mode < 0) cv_mode = 2;
+        case 7:
+            cv_mode += direction;
+            if (cv_mode > 2) cv_mode = 0;
+            if (cv_mode < 0) cv_mode = 2;
+            break;
         }
 
         // knob acceleration and value display for slider params
@@ -192,6 +218,7 @@ public:
         mode[0] = Unpack(data, PackLocation {40,8});
         mode[1] = Unpack(data, PackLocation {48,8});
         cv_mode = Unpack(data, PackLocation {56,8});
+        Reset();
     }
 
 protected:
@@ -206,9 +233,10 @@ protected:
     
 private:
     const uint8_t *MODE_ICONS[3] = {BD_ICON,SN_ICON,HH_ICON};
+    const uint8_t *MODE_PULSE_ICON[3] = {BD_HIT_ICON,SN_HIT_ICON,HH_HIT_ICON};
     const char *CV_MODE_NAMES[3] = {"FILL A/B", "X/Y", "FA/CHAOS"};
     const int *VALUE_MAP[5] = {&fill[0], &fill[1], &x, &y, &chaos};
-    uint8_t cursor = 0;
+    int cursor = 0;
     uint8_t step;
     uint8_t randomness[3] = {0, 0, 0};
     int pulse_animation[2] = {0, 0};
@@ -219,12 +247,14 @@ private:
     // settings
     int8_t mode[2] = {0, 1};
     int fill[2] = {128, 128}; 
+    int _fill[2] = {128, 128};
     int x = 0;
+    int _x = 0;
     int y = 0;
+    int _y = 0;
     int chaos = 0;
+    int _chaos = 0;
     int8_t cv_mode = 0; // 0 = Fill A/B, 1 = X/Y, 2 = Fill A/Chaos
-    int cv1 = 0; // internal tracking of cv inputs
-    int cv2 = 0;
 
     uint8_t ReadDrumMap(uint8_t step, uint8_t part, uint8_t x, uint8_t y) {
       uint8_t i = x >> 6;
@@ -250,70 +280,54 @@ private:
     void DrawInterface() {
         // output selection
         gfxPrint(1,15,"A:");
-        gfxIcon(14,14,MODE_ICONS[mode[0]]);
+        gfxIcon(15,15, (pulse_animation[0] > 0)? MODE_PULSE_ICON[mode[0]] : MODE_ICONS[mode[0]] );
+
         gfxPrint(32,15,"B:");
         if (mode[1] == 3) {
             // accent
-            gfxIcon(45,14,MODE_ICONS[mode[0]]);
+            gfxIcon(46,15,MODE_ICONS[mode[0]]);
             gfxPrint(53,15,">");
         } else {
             // standard
-            gfxIcon(45,14,MODE_ICONS[mode[1]]);
+            gfxIcon(46,15,(pulse_animation[1] > 0)? MODE_PULSE_ICON[mode[1]] : MODE_ICONS[mode[1]]);
         }
+        /*
         // pulse animation per channel
          ForEachChannel(ch){
              if (pulse_animation[ch] > 0) {
                  gfxInvert(1+ch*32,15,8,8);
              }
          }
+        */
 
         // fill
         gfxPrint(1,25,"F");
-        // add cv1 to fill_a value if cv1 mode is set to Fill A
-        int fa = fill[0];
-        if (cv_mode == 0 || cv_mode == 2) fa = constrain(fa+cv1, 0, 255);
-        DrawKnobAt(9,25,20,fa,cursor == 2);
+        DrawSlider(9,25,20,_fill[0], MAX_VAL, cursor == 2);
         // don't show fill for channel b if it is an accent mode
         if (mode[1] < 3) {
             gfxPrint(32,25,"F");
-            // add cv1 to fill_a value if cv1 mode is set to Fill A
-            int fb = fill[1];
-            if (cv_mode == 0) fb = constrain(fb+cv2, 0, 255);
-            DrawKnobAt(40,25,20,fb,cursor == 3);
+            DrawSlider(40,25,20,_fill[1], MAX_VAL, cursor == 3);
         }
         
         // x & y
-        int _x = x;
-        if (cv_mode == 1) _x = constrain(_x+cv1, 0, 255);
         gfxPrint(1,35,"X");
-        DrawKnobAt(9,35,20,_x,cursor == 4);
-        int _y = y;
-        if (cv_mode == 1) _y = constrain(_y+cv2, 0, 255);
+        DrawSlider(9,35,20,_x, MAX_VAL, cursor == 4);
         gfxPrint(32,35,"Y");
-        DrawKnobAt(40,35,20,_y,cursor == 5);
+        DrawSlider(40,35,20,_y, MAX_VAL, cursor == 5);
         
         // chaos
-        int _chaos = chaos;
-        if (cv_mode == 2) _chaos = constrain(_chaos+cv2, 0, 255);
         gfxPrint(1,45,"CHAOS");
-        DrawKnobAt(32,45,28,_chaos,cursor == 6);
+        DrawSlider(32,45,28,_chaos, MAX_VAL, cursor == 6);
         
-        // cv input assignment
-        gfxIcon(1,57,CV_ICON);
-        gfxPrint(10,55,CV_MODE_NAMES[cv_mode]);
-
         // step count in header
         gfxPrint((step < 9 ? 49 : 43),2,step+1);
 
         // cursor for non-knobs
-        if (cursor == 0) gfxCursor(14,23,16); // Part A
-        if (cursor == 1) gfxCursor(45,23,16); // Part B
-        if (cursor == 7) gfxCursor(10,63,50); // CV Assign
+        if (cursor <= 1)
+            gfxCursor(14+cursor*31,23,16); // Part A / B
         
         // display value for knobs
         if (value_animation > 0 && cursor >= 2 && cursor <= 6) {
-          gfxRect(1, 54, 60, 10);
-          gfxInvert(1, 54, 60, 10);
           int val = *VALUE_MAP[cursor-2];
           int xPos = 27;
           if (val > 99) {
@@ -322,15 +336,14 @@ private:
             xPos = 24;
           }
           gfxPrint(xPos, 55, val);
-          gfxInvert(1, 54, 60, 10);
+          gfxInvert(1, 54, 63, 10);
+        } else {
+          // cv input assignment
+          gfxIcon(1,57,CV_ICON);
+          gfxPrint(10,55,CV_MODE_NAMES[cv_mode]);
+          if (cursor == 7) gfxCursor(10,63,50); // CV Assign
         }
-    }
 
-    void DrawKnobAt(byte x, byte y, byte len, byte value, bool is_cursor) {
-        byte w = Proportion(value, 255, len);
-        byte p = is_cursor ? 1 : 3;
-        gfxDottedLine(x, y + 4, x + len, y + 4, p);
-        gfxRect(x + w, y, 2, 7);
     }
 
     void Reset() {

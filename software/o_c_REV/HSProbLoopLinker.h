@@ -23,7 +23,7 @@
 
 class ProbLoopLinker {
 	static ProbLoopLinker *instance;
-	bool ready = false;
+	bool trig_q[2] = {0, 0};
 	uint8_t hemDiv;
 	uint8_t hemMelo;
 	uint32_t registered[2];
@@ -65,13 +65,13 @@ public:
                 && (t - registered[RIGHT_HEMISPHERE] < 160));
     }
 
-    void Trigger() {
-    	ready = true;
+    void Trigger(int ch) {
+    	trig_q[ch] = true;
     }
 
-    bool Ready() {
-    	if (IsLinked() && ready) {
-    		ready = false;
+    bool TrigPop(int ch) {
+    	if (IsLinked() && trig_q[ch]) {
+    		trig_q[ch] = false;
     		return true;
     	}
     	return false;
@@ -97,7 +97,7 @@ public:
     	reseed = true;
     }
 
-    int ShouldReseed() {
+    bool ShouldReseed() {
     	if (reseed) {
     		reseed = false;
     		return true;

@@ -45,7 +45,6 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawInterface();
     }
 
@@ -53,7 +52,7 @@ public:
     }
 
     void OnEncoderMove(int direction) {
-        amp_offset_pct = constrain(amp_offset_pct += direction, 0, 100);
+        amp_offset_pct = constrain(amp_offset_pct + direction, 0, 100);
         amp_offset_cv = Proportion(amp_offset_pct, 100, HEMISPHERE_MAX_CV);
     }
 

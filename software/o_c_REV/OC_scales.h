@@ -2,6 +2,7 @@
 #define OS_SCALES_H_
 
 #include "braids_quantizer.h"
+#include "braids_quantizer_scales.h"
 
 // Common scales and stuff
 namespace OC {
@@ -13,8 +14,6 @@ static constexpr int kMinScaleLength = 4;
 
 class Scales {
 public:
-
-  static const int NUM_SCALES;
 
   enum {
     SCALE_USER_0,
@@ -28,6 +27,7 @@ public:
 
   static void Init();
   static const Scale &GetScale(int index);
+  static constexpr int NUM_SCALES = SCALE_USER_LAST + sizeof(braids::scales) / sizeof(braids::scales[0]);
 };
 
 // H1200/A11Z are semitone based, so don't need to go "full quanty" for now.

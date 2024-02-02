@@ -97,8 +97,8 @@ public:
         int32_t bd_signal = 0;
         int32_t sd_signal = 0;
         int32_t ns_signal = 0;
-        cv_kick = Proportion(DetentedIn(CH_KICK), HEMISPHERE_MAX_CV, BNC_MAX_PARAM);
-        cv_snare = Proportion(DetentedIn(CH_SNARE), HEMISPHERE_MAX_CV, BNC_MAX_PARAM);
+        cv_kick = Proportion(DetentedIn(CH_KICK), HEMISPHERE_MAX_INPUT_CV, BNC_MAX_PARAM);
+        cv_snare = Proportion(DetentedIn(CH_SNARE), HEMISPHERE_MAX_INPUT_CV, BNC_MAX_PARAM);
 
         // Kick drum
         if (cv_mode_kick == CV_MODE_TONE) {
@@ -121,7 +121,7 @@ public:
         } else {
             _decay_punch = decay_punch;
         }
-        if (Clock(CH_KICK, 1)) {
+        if (Clock(CH_KICK, 0)) {
             SetEnvDecayKick(_decay_kick);
             SetEnvDecayPunch(_decay_punch);
             env_kick.Start();
@@ -170,7 +170,7 @@ public:
         } else {
             _blend_snare = blend_snare;
         }
-        if (Clock(CH_SNARE, 1)) {
+        if (Clock(CH_SNARE, 0)) {
             SetEnvDecaySnare(_decay_snare);
             SetEnvDecaySnap(_decay_snare);
             env_snare.Start();
@@ -219,50 +219,55 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawInterface();
     }
 
     void OnButtonPress() {
-        if (++cursor > 9) cursor = 0;
+        CursorAction(cursor, 9);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 9);
+            return;
+        }
+
+        switch (cursor) {
         // Kick drum
-        if (cursor == 0) {
+        case 0:
             tone_kick = constrain(tone_kick + direction, 0, BNC_MAX_PARAM);
-        }
-        if (cursor == 1) {
+            break;
+        case 1:
             decay_kick = constrain(decay_kick + direction, 0, BNC_MAX_PARAM);
-        }
-        if (cursor == 2) {
+            break;
+        case 2:
             punch = constrain(punch + direction, 0, BNC_MAX_PARAM);
-        }
-        if (cursor == 3) {
+            break;
+        case 3:
             decay_punch = constrain(decay_punch + direction, 0, BNC_MAX_PARAM);
-        }
-        if (cursor == 4) {
+            break;
+        case 4:
             cv_mode_kick = constrain(cv_mode_kick + direction, 0, 4);
-        }
+            break;
 
         // Snare drum
-        if (cursor == 5) {
+        case 5:
             tone_snare = constrain(tone_snare + direction, 0, BNC_MAX_PARAM);
-        }
-        if (cursor == 6) {
+            break;
+        case 6:
             decay_snare = constrain(decay_snare + direction, 0, BNC_MAX_PARAM);
-        }
-        if (cursor == 7) {
+            break;
+        case 7:
             snap = constrain(snap + direction, 0, BNC_MAX_PARAM);
-        }
-        if (cursor == 8) {
+            break;
+        case 8:
             blend_snare = constrain(blend_snare + direction, 0, BNC_MAX_PARAM);
-        }
-        if (cursor == 9) {
+            break;
+        case 9:
             cv_mode_snare = constrain(cv_mode_snare + direction, 0, 4);
+            break;
         }
 
-        ResetCursor();
     }
 
     uint64_t OnDataRequest() {
@@ -358,41 +363,40 @@ private:
         DrawDrumBody(1, _tone_kick, _decay_kick, _punch, _decay_punch, 0);
         DrawDrumBody(32, _tone_snare, _decay_snare, _snap, _blend_snare, 1);
 
-        // CV modes
-        gfxIcon(1, 57, CV_ICON);
-        gfxPrint(10, 55, CV_MODE_NAMES_BD[cv_mode_kick]);
-        gfxIcon(32, 57, CV_ICON);
-        gfxPrint(41, 55, CV_MODE_NAMES_SN[cv_mode_snare]);
-
         switch (cursor) {
             // Kick drum
             case 0:
-                gfxPrint(1, 45, Proportion(_tone_kick, BNC_MAX_PARAM, 30) + 30);
-                gfxIcon(22, 44, HERTZ_ICON);
+                gfxPrint(1, 55, Proportion(_tone_kick, BNC_MAX_PARAM, 30) + 30);
+                gfxIcon(22, 54, HERTZ_ICON);
                 break;
             case 1:
-                gfxPrint(1, 45, "decay"); break;
+                gfxPrint(1, 55, "decay"); break;
             case 2:
-                gfxPrint(1, 45, "punch"); break;
+                gfxPrint(1, 55, "punch"); break;
             case 3:
-                gfxPrint(1, 45, "drop"); break;
-            case 4:
-                gfxInvert(1, 54, 30, 9); break;
+                gfxPrint(1, 55, "drop"); break;
+            case 4: // CV modes
+                gfxIcon(1, 57, CV_ICON);
+                gfxPrint(10, 55, CV_MODE_NAMES_BD[cv_mode_kick]);
+                break;
 
             // Snare drum
             case 5:
-                gfxPrint(35, 45, Proportion(_tone_snare, BNC_MAX_PARAM, 600) + 100);
-                gfxIcon(54, 44, HERTZ_ICON);
+                gfxPrint(35, 55, Proportion(_tone_snare, BNC_MAX_PARAM, 600) + 100);
+                gfxIcon(54, 54, HERTZ_ICON);
                 break;
             case 6:
-                gfxPrint(32, 45, "decay"); break;
+                gfxPrint(32, 55, "decay"); break;
             case 7:
-                gfxPrint(32, 45, "snap"); break;
+                gfxPrint(32, 55, "snap"); break;
             case 8:
-                gfxPrint(32, 45, "blend"); break;
-            case 9:
-                gfxInvert(32, 54, 30, 9); break;
+                gfxPrint(32, 55, "blend"); break;
+            case 9: // CV modes
+                gfxIcon(32, 57, CV_ICON);
+                gfxPrint(41, 55, CV_MODE_NAMES_SN[cv_mode_snare]);
+                break;
         }
+        if (EditMode()) gfxInvert(1 + (cursor<5?0:31), 54, 31, 9);
 
         // Level indicators
         ForEachChannel(ch)

@@ -69,15 +69,19 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawInterface();
     }
 
     void OnButtonPress() {
-        if (++cursor > 3) cursor = 0;
+        CursorAction(cursor, 3);
     }
 
     void OnEncoderMove(int direction) {
+        if (!EditMode()) {
+            MoveCursor(cursor, direction, 3);
+            return;
+        }
+
         if (cursor == 0) { // Switch TM
             byte prev_tm = tm_state.GetTMIndex();
             byte new_tm = constrain(prev_tm + direction, 0, HS::TURING_MACHINE_COUNT - 1);

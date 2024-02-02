@@ -37,28 +37,23 @@ public:
     }
 
     void Controller() {
-        if (Clock(1)) {
-            reset = true;
-            ForEachChannel(ch) step[ch] = 0;
+        if (Clock(1)) { // reset
+            ForEachChannel(ch) step[ch] = -1;
         }
 
-        if (Clock(0)) {
+        if (Clock(0)) { // clock advance
             bool swap = In(0) >= HEMISPHERE_3V_CV;
-            if (!reset) {
-                ForEachChannel(ch) step[ch]++;
-            }
-            reset = false;
             ForEachChannel(ch)
             {
-                if (step[ch] > end_step[ch]) step[ch] = 0;
-                if ((pattern[ch] >> step[ch]) & 0x01) ClockOut(swap ? (1 - ch) : ch);
+                if (step[ch] >= end_step[ch]) step[ch] = -1;
+                step[ch]++;
+                active_step[ch] = Step(ch);
+                if ((pattern[ch] >> active_step[ch]) & 0x01) ClockOut(swap ? (1 - ch) : ch);
             }
-
         }
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawDisplay();
     }
 
@@ -74,7 +69,7 @@ public:
 
         // Update end_step
         if (this_cursor == 2) {
-            end_step[ch] = constrain(end_step[ch] += direction, 0, 7);
+            end_step[ch] = constrain(end_step[ch] + direction, 0, 7);
         } else {
             // Get the current pattern
             int curr_patt = pattern[ch];
@@ -104,6 +99,8 @@ public:
         pattern[1] = Unpack(data, PackLocation {8,8});
         end_step[0] = Unpack(data, PackLocation {16,3});
         end_step[1] = Unpack(data, PackLocation {19,3});
+
+        ForEachChannel(ch) step[ch] = -1;
     }
 
 protected:
@@ -115,19 +112,38 @@ protected:
         help[HEMISPHERE_HELP_ENCODER]  = "T=Set P=Select";
         //                               "------------------" <-- Size Guide
     }
-    
+
 private:
     int step[2]; // Current step of each channel
+    int active_step[2];
     uint8_t pattern[2];
     int end_step[2];
     int cursor; // 0=ch1 low, 1=ch1 hi, 2=c1 end_step,  3=ch2 low, 4=ch3 hi, 5=ch2 end_step
     bool reset;
+
+    inline int Length(int ch) const {
+        return end_step[ch] + 1;
+    }
+
+    int Step(int ch) {
+        int s = step[ch] + Offset(ch);
+        s %= Length(ch);
+        return s;
+    }
+
+    int Offset(int ch) {
+        int offset = Proportion(DetentedIn(1), HEMISPHERE_MAX_INPUT_CV, end_step[ch]);
+        if (offset < 0) offset += Length(ch);
+        offset %= Length(ch);
+        return offset;
+    }
     
     void DrawDisplay() {
         ForEachChannel(ch)
         {
             int this_cursor = cursor - (3 * ch);
             int x = 10 + (31 * ch);
+            int offset = Offset(ch);
 
             // Draw the steps for this channel
             bool stop = 0; // Stop displaying when end_step is reached
@@ -145,8 +161,12 @@ private:
                         }
                     }
 
-                    if (s == step[ch]) {
+                    if (s == active_step[ch]) {
                         gfxLine(x + 4, y, x + 10, y);
+                    }
+
+                    if (s == offset) {
+                        gfxFrame(x - 4, y - 4, 9, 9);
                     }
 
                     // Draw the end_step cursor

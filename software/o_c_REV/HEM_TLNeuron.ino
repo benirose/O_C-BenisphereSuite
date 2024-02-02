@@ -44,7 +44,7 @@ public:
                 dendrite_activated[ch] = 0;
             }
         }
-        if (In(0) > (HEMISPHERE_MAX_CV / 2)) {
+        if (In(0) > (HEMISPHERE_MAX_INPUT_CV / 2)) {
             sum += dendrite_weight[2];
             dendrite_activated[2] = 1;
         } else {
@@ -67,7 +67,6 @@ public:
     }
 
     void View() {
-        gfxHeader(applet_name());
         DrawDendrites();
         DrawAxon();
         DrawStates();

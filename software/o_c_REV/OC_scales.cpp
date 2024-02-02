@@ -1,13 +1,9 @@
 #include "OC_scales.h"
-#include "braids_quantizer_scales.h"
 
 namespace OC {
 
 Scale user_scales[Scales::SCALE_USER_LAST];
 Scale dummy_scale;
-
-/*static*/
-const int Scales::NUM_SCALES = OC::Scales::SCALE_USER_LAST + sizeof(braids::scales) / sizeof(braids::scales[0]);
 
 /*static*/
 void Scales::Init() {
@@ -24,10 +20,10 @@ const Scale &Scales::GetScale(int index) {
 }
 
 const char* const scale_names_short[] = {
-    "USER1",
-    "USER2",
-    "USER3",
-    "USER4",
+    "USR1",
+    "USR2",
+    "USR3",
+    "USR4",
     "OFF ",
     "SEMI",
     "IONI",
@@ -159,7 +155,26 @@ const char* const scale_names_short[] = {
     "14S3",
     "12S3",
     "10S3",
-    "8S3"
+    "8S3",
+
+    "5+7", // Root +5th + 7th (5+7), 
+    "5+6", // Root + 5th + 6th (5+6), 
+    "3b7-",// Minor Triad + 7 (3b+5+7), 
+    "3b7+",// Major Triad + 7 (Triad+7), 
+    "3b6-",// Minor Triad + 6th (3b+5+6), 
+    "3b6+",// Major Triad + 6th (Triad+6), 
+    "5th", // Fifth, 
+    "3b+", // major triad (Triad), 
+    "3b-", // minor triad (3b+5), 
+    "HAR-",// Harmonic Minor (Harm Minor), aka "HMIN"
+
+    "LOn6",
+    "IAUG",
+    "MBKH",
+    "FREY",
+    "LY#9",
+    "UTLO", 
+    
     };
 
 const char* const scale_names[] = {
@@ -298,7 +313,26 @@ const char* const scale_names[] = {
     "21-7-SD3[14]",
     "18-6-SD3[12]",
     "15-5-SD3[10]",
-    "12-4-SD3[8]"
+    "12-4-SD3[8]",
+
+    "5th+7th", // Root +5th + 7th (5+7), 
+    "5th+6th", // Root + 5th + 6th (5+6), 
+    "Triad min+7",// Minor Triad + 7 (3b+5+7), 
+    "Triad maj+7",// Major Triad + 7 (Triad+7), 
+    "Triad min+6",// Minor Triad + 6th (3b+5+6), 
+    "Triad maj+6",// Major Triad + 6th (Triad+6), 
+    "Fifth",// Fifth, 
+    "TriadMaj", // major triad (Triad), 
+    "TriadMin",// minor triad (3b+5), 
+    "HarmonicMin",// Harmonic Minor (Harm Minor),
+
+    "Locrian n6",
+    "Ionian aug",
+    "Misheberakh",
+    "Freygish",
+    "Lydian #9",
+    "Ultralocrian",
+
     };
 
 const char* const voltage_scalings[] = {

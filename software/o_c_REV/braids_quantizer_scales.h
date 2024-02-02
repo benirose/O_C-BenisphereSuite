@@ -301,7 +301,52 @@ const Scale scales[] = {
 //  // 15-5-HD3 (10 step subharmonic series scale on the tritave) - see Xen-Arts VSTi microtuning library at http://www.xen-arts.net/Xen-Arts%20VSTi%20Microtuning%20Library.zip
 { 12 << 7, 10, { 0, 96,  200, 312, 434, 567, 714, 879, 1066,  1281} },
 //  // 12-4-HD3 (8 step subharmonic series scale on the tritave) - see Xen-Arts VSTi microtuning library at http://www.xen-arts.net/Xen-Arts%20VSTi%20Microtuning%20Library.zip
-{ 12 << 7, 8, { 0,  122, 255, 402, 567, 754, 969, 1224} }
+{ 12 << 7, 8, { 0,  122, 255, 402, 567, 754, 969, 1224} },
+
+  // Logarhythm Mod: Adding some musically useful equal temperment scales from the Disting mk.4 set that are otherwise not present here
+  // Root +5th + 7th (5+7), 
+  { 12 << 7, 3, { 0, 896, 1408} }, 
+  
+  // Root + 5th + 6th (5+6), 
+  { 12 << 7, 3, { 0, 896, 1152} }, 
+  
+  // Minor Triad + 7 (3b+5+7), 
+  { 12 << 7, 4, { 0, 384, 896, 1280} }, 
+  
+  // Major Triad + 7 (Triad+7), 
+  { 12 << 7, 4, { 0, 512, 896, 1408} }, 
+  
+  // Minor Triad + 6th (3b+5+6), 
+  { 12 << 7, 4, { 0, 384, 896, 1152} }, 
+  
+  // Major Triad + 6th (Triad+6), 
+  { 12 << 7, 4, { 0, 512, 896, 1152} }, 
+  
+  // Fifth, 
+  { 12 << 7, 2, { 0, 896} }, 
+  
+  // major triad (Triad), 
+  { 12 << 7, 3, { 0, 512, 896} }, 
+  
+  // minor triad (3b+5), 
+  { 12 << 7, 3, { 0, 384, 896} }, 
+  
+  // Harmonic Minor (Harm Minor),
+  { 12 << 7, 7, { 0, 256, 384, 640, 896, 1024, 1408} }, 
+
+  // Locrian n6
+  { 12 << 7, 7, { 0, 128, 384, 640, 768, 1152, 1280} },
+  // Ionian augmented
+  { 12 << 7, 7, { 0, 256, 512, 640, 1024, 1152, 1408} },
+  // Misheberakh
+  { 12 << 7, 7, { 0, 256, 384, 768, 896, 1152, 1280} },
+  // Freygish
+  { 12 << 7, 7, { 0, 128, 512, 640, 896, 1024, 1280} },
+  // Lydian #9
+  { 12 << 7, 7, { 0, 384, 512, 768, 896, 1152, 1408} },
+  // Ultralocrian
+  { 12 << 7, 7, { 0, 128, 384, 512, 768, 1024, 1152} },
+
   } ;
 }// namespace braids
 

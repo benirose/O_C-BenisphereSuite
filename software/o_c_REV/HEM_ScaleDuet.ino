@@ -36,31 +36,41 @@ public:
         {
             mask[scale] = 0xffff;
         }
-        quantizer.Init();
-        quantizer.Configure(OC::Scales::GetScale(5), mask[0]);
+        QuantizerConfigure(0, OC::Scales::SCALE_SEMI, mask[0]);
         last_scale = 0;
-        adc_lag_countdown = 0;
     }
 
     void Controller() {
+        // unclock if >2V on CV2
+        if (In(1) > 24*128) {
+            continuous = 1;
+        }
+
         // Prepare to read pitch and send gate in the near future; there's a slight
         // lag between when a gate is read and when the CV can be read.
-        if (Clock(0)) StartADCLag();
+        if (Clock(0)) {
+            continuous = 0;
+            StartADCLag();
+        }
 
-        if (EndOfADCLag()) {
+        if (continuous || EndOfADCLag()) {
             uint8_t scale = Gate(1);
             if (scale != last_scale) {
-                quantizer.Configure(OC::Scales::GetScale(5), mask[scale]);
+                QuantizerConfigure(0, OC::Scales::SCALE_SEMI, mask[scale]);
                 last_scale = scale;
             }
-            int32_t pitch = In(0);
-            int32_t quantized = quantizer.Process(pitch, 0, 0);
-            Out(0, quantized);
+
+            int new_pitch = Quantize(0, In(0), 0, 0);
+            if (q_pitch != new_pitch)
+                ClockOut(1);
+            q_pitch = new_pitch;
+
+            Out(0, q_pitch);
         }
     }
 
     void View() {
-        gfxHeader(applet_name());
+        if (!continuous) gfxIcon(0, 13, CLOCK_ICON);
         DrawKeyboard();
         DrawMaskIndicators();
     }
@@ -71,12 +81,13 @@ public:
 
         // Toggle the mask bit at the cursor position
         mask[scale] ^= (0x01 << bit);
-        if (scale == last_scale) quantizer.Configure(OC::Scales::GetScale(5), mask[scale]);
+        if (scale == last_scale)
+            QuantizerConfigure(0, OC::Scales::SCALE_SEMI, mask[scale]);
     }
 
     void OnEncoderMove(int direction) {
         if (cursor == 0 && direction == -1) cursor = 1;
-        cursor = constrain(cursor += direction, 0, 23);
+        cursor = constrain(cursor + direction, 0, 23);
         ResetCursor();
     }
         
@@ -92,25 +103,25 @@ public:
         mask[1] = Unpack(data, PackLocation {12,12});
 
         last_scale = 0;
-        quantizer.Configure(OC::Scales::GetScale(5), mask[last_scale]);
+        QuantizerConfigure(0, OC::Scales::SCALE_SEMI, mask[last_scale]);
     }
 
 protected:
     void SetHelp() {
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=ScaleSel";
-        help[HEMISPHERE_HELP_CVS]      = "1=CV";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Pitch";
+        help[HEMISPHERE_HELP_CVS]      = "1=CV    2=Unclock";
+        help[HEMISPHERE_HELP_OUTS]     = "A=Pitch B=Trig";
         help[HEMISPHERE_HELP_ENCODER]  = "T=Note P=Toggle";
         //                               "------------------" <-- Size Guide
     }
     
 private:
-    braids::Quantizer quantizer;
     uint16_t mask[2];
     uint8_t cursor; // 0-11=Scale 1; 12-23=Scale 2
     uint8_t last_scale; // The most-recently-used scale (used to set the mask when necessary)
-    int adc_lag_countdown;
+    int q_pitch;
+    bool continuous = 1;
 
     void DrawKeyboard() {
         // Border
