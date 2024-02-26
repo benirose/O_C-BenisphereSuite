@@ -24,6 +24,7 @@
 #define OC_APP_H_
 
 #include "UI/ui_events.h"
+#include "util/util_turing.h"
 #include "util/util_misc.h"
 
 namespace OC {
