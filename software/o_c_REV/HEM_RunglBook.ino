@@ -42,12 +42,13 @@ public:
             }
             int bitmask = (1 << bitdepth) - 1;
             int rungle = Proportion(reg & bitmask, bitmask, HEMISPHERE_MAX_CV);
-            int rungle_tap = Proportion((reg >> 5) & bitmask, bitmask, HEMISPHERE_MAX_CV);
- 
+            //int rungle_tap = Proportion((reg >> 5) & bitmask, bitmask, HEMISPHERE_MAX_CV);
+            int msb = (reg >> 7) & 0x01;
+            int out2 = Proportion(msb, 1, HEMISPHERE_MAX_CV);
             
 
             Out(0, rungle);
-            Out(1, rungle_tap);
+            Out(1, out2);
         }
     }
 
@@ -107,8 +108,8 @@ protected:
         //                               "------------------" <-- Size Guide
         help[HEMISPHERE_HELP_DIGITALS] = "1=Clock 2=Freeze";
         help[HEMISPHERE_HELP_CVS]      = "1=Signal";
-        help[HEMISPHERE_HELP_OUTS]     = "A=Rungle B=Alt";
-        help[HEMISPHERE_HELP_ENCODER]  = "Threshold";
+        help[HEMISPHERE_HELP_OUTS]     = "A=Rungle B=bit1";
+        help[HEMISPHERE_HELP_ENCODER]  = "Threshold/BitDepth";
         //                               "------------------" <-- Size Guide
     }
     
