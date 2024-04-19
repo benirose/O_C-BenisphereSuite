@@ -27,6 +27,8 @@ public:
 
     void Start() {
         threshold = (12 << 7) * 2;
+        bitdepth = 3;
+        parameterSelection = 0; // Start by adjusting threshold
     }
 
     void Controller() {
@@ -38,35 +40,66 @@ public:
                 byte b0 = In(0) > threshold ? 0x01 : 0x00;
                 reg = (reg << 1) | b0;
             }
-
-            int rungle = Proportion(reg & 0x07, 0x07, HEMISPHERE_MAX_CV);
-            int rungle_tap = Proportion((reg >> 5) & 0x07, 0x07, HEMISPHERE_MAX_CV);
+            int bitmask = (1 << bitdepth) - 1;
+            int rungle = Proportion(reg & bitmask, bitmask, HEMISPHERE_MAX_CV);
+            int rungle_tap = Proportion((reg >> 5) & bitmask, bitmask, HEMISPHERE_MAX_CV);
+ 
+            
 
             Out(0, rungle);
             Out(1, rungle_tap);
         }
     }
 
+
     void View() {
-        gfxPrint(1, 15, "Thr:");
-        gfxPrintVoltage(threshold);
+        if (parameterSelection == 0) {
+            gfxPrint(1, 15, "Thr:");
+            gfxPrintVoltage(threshold);
+
+        } else {
+            gfxPrint(1, 15, "Bit:");
+            gfxPrint(bitdepth);
+        }
+        if (adjustingParameter) {
+            gfxCursor(25, 24, 36);
+        }
         gfxSkyline();
     }
 
-    void OnButtonPress() { }
-
-    void OnEncoderMove(int direction) {
-        threshold += (direction * 128);
-        threshold = constrain(threshold, (12 << 7), (12 << 7) * 5); // 1V - 5V
+    void OnButtonPress() {
+        // Toggle parameter adjustment mode when button is pressed
+        adjustingParameter = !adjustingParameter;
     }
+
+void OnEncoderMove(int direction) {
+    if (!adjustingParameter) {
+        // Toggle between parameter selections (Thr and Bit)
+        parameterSelection = 1 - parameterSelection; // Toggle between 0 and 1
+    } else {
+        // Adjust the currently selected parameter
+        if (parameterSelection == 0) {
+            // Adjust threshold
+            threshold += (direction * 128);
+            threshold = constrain(threshold, (12 << 7), (12 << 7) * 5); // 1V - 5V
+        } else {
+            // Adjust bitdepth
+            bitdepth += direction;
+            bitdepth = constrain(bitdepth, 1, 8); // Limit bitdepth between 1 and 8
+        }
+    }
+}
+
         
     uint64_t OnDataRequest() {
         uint64_t data = 0;
         Pack(data, PackLocation {0,16}, threshold);
+        Pack(data, PackLocation {16,8}, bitdepth);
         return data;
     }
     void OnDataReceive(uint64_t data) {
         threshold = Unpack(data, PackLocation {0,16});
+        bitdepth = Unpack(data, PackLocation {16,8});
     }
 
 protected:
@@ -82,6 +115,9 @@ protected:
 private:
     byte reg;
     uint16_t threshold;
+    uint8_t bitdepth;
+    uint8_t parameterSelection; // 0: Threshold, 1: Bitdepth
+    bool adjustingParameter; // Flag to indicate parameter adjustment mode
 };
 
 
