@@ -27,6 +27,7 @@ class RelabiManager {
     int lfo2;
     int lfo3;
     int lfo4;
+    bool gateStates[4];
     uint8_t leftOn;
     uint8_t rightOn;
     bool linked;
@@ -43,6 +44,11 @@ class RelabiManager {
         linked = false;
         registered[LEFT_HEMISPHERE] = 0;
         registered[RIGHT_HEMISPHERE] = 0;
+
+        // Initialize gate states
+        for (int i = 0; i < 4; i++) {
+            gateStates[i] = false;
+        }
     }
 
 public:
@@ -79,20 +85,16 @@ public:
         value4 = lfo4;
     }
 
-    void WriteMul(uint8_t lfm) {
-        linkedFreqMultiplier = lfm;
+    void WriteGates(bool gates[4]) {
+        for (int i = 0; i < 4; i++) {
+            gateStates[i] = gates[i];
+        }
     }
 
-    void ReadMul(uint8_t &lfm) const {
-        lfm = linkedFreqMultiplier;
-    }
-
-    void WriteDiv(uint8_t ldm) {
-        linkedFreqDivider = ldm;
-    }
-
-    void ReadDiv(uint8_t &ldm) {
-        ldm = linkedFreqDivider;
+    void ReadGates(bool gates[4]) const {
+        for (int i = 0; i < 4; i++) {
+            gates[i] = gateStates[i];
+        }
     }
 };
 

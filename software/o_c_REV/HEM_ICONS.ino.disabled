@@ -115,7 +115,7 @@ private:
         LEFT_RIGHT_ICON,
         SEGMENT_ICON,
         WAVEFORM_ICON
-    };
+    };gfxIcon
     
     void DrawInterface() {
         gfxSkyline();

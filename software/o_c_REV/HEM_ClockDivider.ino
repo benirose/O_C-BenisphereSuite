@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#define HEM_CLOCKDIV_MAX 8
+#define HEM_CLOCKDIV_MAX 24
 
 class ClockDivider : public HemisphereApplet {
 public:
