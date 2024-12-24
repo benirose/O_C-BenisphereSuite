@@ -107,36 +107,26 @@ public:
             ImprintChord(chord);
             cursor = CHORD; // keep cursor on chord selection
         }
+        if (++cursor > 3) cursor = 0;
+        ResetCursor();
     }
 
     void OnEncoderMove(int direction) {
-        if (!EditMode()) {
-            MoveCursor(cursor, direction, LAST_SETTING);
-            return;
-        }
-
-        switch ((CarpeggioCursor)cursor) {
-        case NOTE_EDIT:
-            sequence[step] = constrain(sequence[step] + direction, -24, 60);
-            break;
-        case CHORD:
-            chord = constrain(chord + direction, 0, Nr_of_arp_chords - 1);
-            break;
-        case TRANSPOSE:
-            transpose = constrain(transpose + direction, -24, 24);
-            break;
-
-        case SHUFFLE:
+        if (cursor == 0) sequence[step] = constrain(sequence[step] += direction, -24, 60);
+        if (cursor == 1) chord = constrain(chord += direction, 0, Nr_of_arp_chords - 1);
+        if (cursor == 2) transpose = constrain(transpose += direction, -24, 24);
+        if (cursor == 3) {
+            // only imprint cord when turning left from shuffle
             if (shuffle && direction < 0) {
                 ImprintChord(sel_chord);
             }
+            // shuffle chord every time we turn right
             if (direction > 0) {
                 ShuffleChord();
             }
-            break;
+            
         }
-
-        if (cursor != CHORD) replay = 1;
+        if (cursor != 1) replay = 1;
     }
         
     uint64_t OnDataRequest() {
@@ -192,13 +182,13 @@ private:
         gfxPrint(32, 25, "Tr");
         gfxPrint(transpose < 0 ? "" : "+");
         gfxPrint(transpose);
-        if (cursor == TRANSPOSE) gfxCursor(32, 33, 30);
+        if (cursor == 2) gfxCursor(32, 33, 30);
 
         // Shuffle selector
         gfxBitmap(37, 36, 8, PLAY_ICON);
         gfxBitmap(49, 36, 8, LOOP_ICON);
         gfxInvert(36 + (shuffle ? 12 : 0), 35, 10, 10);
-        if (cursor == SHUFFLE) gfxCursor(36, 46, 22, 11);
+        if (cursor == 3) gfxCursor(37, 46, 20);
 
         // Note name editor
         uint8_t midi_note = constrain(sequence[step] + 36 + transpose, 0, 127);
