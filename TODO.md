@@ -1,26 +1,43 @@
-TODO
+TODO (Roadmap)
 ===
 
-* Auto-tuner floor/ceiling detection (fail gracefully)
-* Move calibration routines to a proper App
-* Runtime filtering/hiding of Applets
-* Flexible input remapping for Hemisphere
-  - generalize applet params for assignment
-* global quantizer settings in Hemisphere Config
-* applet with modal interchange (CV modulation of scale)
-* Subharmonicon app/applets
-* Update Boilerplates
-* add swing/shuffle to internal clock
-* Automatic stop for internal Clock?
-* Polyphonic MIDI input tracking
-* MIDI output for all apps?
+# v1.9
+* Config files on LittleFS / SD for T4.x
+* Unipolar variant of SequenceX?
+* T4.1 - expand to 8 channels: Piqued, Quadraturia, Captain MIDI
 
-[APP IDEAS]
-* QUADRANTS
-* Two Spheres
+# v2.0
+* **Fully merge "abandoned/refactoring" branch from pld**
+  - this is partially done on the dev/2.0 branch
+* Auto-tuner with floor/ceiling detection (fail gracefully)
+* generalized AppletParams for flexible assignment, extra virtual I/O
+  - MIDI Learn for anything
+* Audio Applets for T4.1
+* Integrate Calibr8or with DAC for global tracking adjustments
+
+# ???
+* Update Boilerplates - I just assume this needs attention
+* MORE MIDI STUFF:
+    - MIDI looper applet!
+    - better Polyphonic MIDI input tracking
+    - MIDI output for all apps?
+    - Implement some MIDI SysEx commands, sheesh
+    - WebMIDI interface
+
+# APP IDEAS
+* Two Spheres (two applets in series on each side)
 * Snake Game
 
-[DONE]
+# [DONE]
+* Multipliers in DivSeq (maybe a separate applet)
+* Runtime filtering/hiding of Applets
+* QUADRANTS
+* Automatic stop for internal Clock
+* global quantizer settings in Hemisphere Config
+* Flexible input remapping for Hemisphere
+* Move calibration routines to a proper App
+* add swing/shuffle to internal clock
+* applet with modal interchange - MultiScale or ScaleDuet
 * Add auto-tuner to Calibr8or
 * ProbMeloD - alternate melody on 2nd output
 * Fix FLIP_180 calibration
