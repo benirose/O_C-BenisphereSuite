@@ -24,10 +24,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "vector_osc/HSVectorOscillator.h"
-#include "vector_osc/WaveformManager.h"
-#include "HSRelabiManager.h"
-#include "HSicons.h"
+#include "../vector_osc/HSVectorOscillator.h"
+#include "../vector_osc/WaveformManager.h"
+#include "../HSRelabiManager.h"
+#include "../PhzIcons.h"
 
 class Relabi : public HemisphereApplet {
 
@@ -539,20 +539,23 @@ void OnEncoderMove(int direction) {
 protected:
     void SetHelp() {
         if (linked && hemisphere == RIGHT_HEMISPHERE) {
-            help[HEMISPHERE_HELP_DIGITALS] = "1=NA 2=NA";
-            help[HEMISPHERE_HELP_CVS] = "1=NA 2=NA";
-            help[HEMISPHERE_HELP_OUTS] = "A=LFO3 B=LFO4";
-            help[HEMISPHERE_HELP_ENCODER] = "GlobalFreqMul/Div";
-        } else if (currentPage == 0) {
-            help[HEMISPHERE_HELP_DIGITALS] = "1=ResetPhase 2=NA";
-            help[HEMISPHERE_HELP_CVS] = "1=AllFreq 2=AllXFM";
-            help[HEMISPHERE_HELP_OUTS] = "A=LFO1 B=LFO2";
-            help[HEMISPHERE_HELP_ENCODER] = "Frq/XFM/Phs/Thrs";
-        } else if (currentPage == 1) {
-            help[HEMISPHERE_HELP_DIGITALS] = "1=NA 2=NA";
-            help[HEMISPHERE_HELP_CVS] = "1=Thresh";
-            help[HEMISPHERE_HELP_OUTS] = "A=OUT1 B=OUT2";
-            help[HEMISPHERE_HELP_ENCODER] = "Thresh/Pol/Out";
+            help[HELP_DIGITAL1] = "";
+            help[HELP_DIGITAL2] = "";
+            help[HELP_CV1]      = "";
+            help[HELP_CV2]      = "";
+            help[HELP_OUT1]     = "C";
+            help[HELP_OUT2]     = "D";
+            help[HELP_EXTRA1]   = "";
+            help[HELP_EXTRA2]   = "";
+        } else {
+            help[HELP_DIGITAL1] = "Reset";
+            help[HELP_DIGITAL2] = "Phase";
+            help[HELP_CV1]      = "AllFreq";
+            help[HELP_CV2]      = "AllXmod";
+            help[HELP_OUT1]     = "LFO 1";
+            help[HELP_OUT2]     = "LFO 2";
+            help[HELP_EXTRA1]   = "Set: Frq/XFM/Phs/Thrs";
+            help[HELP_EXTRA2]   = "";
         }
     }
 
@@ -630,23 +633,3 @@ private:
     
 };
 
-
-
-////////////////////////////////////////////////////////////////////////////////
-//// Hemisphere Applet Functions
-///
-///  Once you run the find-and-replace to make these refer to Relabi,
-///  it's usually not necessary to do anything with these functions. You
-///  should prefer to handle things in the HemisphereApplet child class
-///  above.
-////////////////////////////////////////////////////////////////////////////////
-Relabi Relabi_instance[2];
-
-void Relabi_Start(bool hemisphere) {Relabi_instance[hemisphere].BaseStart(hemisphere);}
-void Relabi_Controller(bool hemisphere, bool forwarding) {Relabi_instance[hemisphere].BaseController(forwarding);}
-void Relabi_View(bool hemisphere) {Relabi_instance[hemisphere].BaseView();}
-void Relabi_OnButtonPress(bool hemisphere) {Relabi_instance[hemisphere].OnButtonPress();}
-void Relabi_OnEncoderMove(bool hemisphere, int direction) {Relabi_instance[hemisphere].OnEncoderMove(direction);}
-void Relabi_ToggleHelpScreen(bool hemisphere) {Relabi_instance[hemisphere].HelpScreen();}
-uint64_t Relabi_OnDataRequest(bool hemisphere) {return Relabi_instance[hemisphere].OnDataRequest();}
-void Relabi_OnDataReceive(bool hemisphere, uint64_t data) {Relabi_instance[hemisphere].OnDataReceive(data);}
