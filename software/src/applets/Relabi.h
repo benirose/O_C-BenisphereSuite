@@ -569,12 +569,17 @@ private:
     constexpr static uint8_t ch = 4;
     constexpr static uint8_t numParams = 5;
     uint8_t selectedOsc;
+
+    // parameters to be saved and loaded
     float freq[ch]; // in centihertz
     uint16_t xmod[ch];
+    uint8_t phase[ch];
     uint16_t xmodoffset;
+
+
     uint16_t xmodplus;
     //uint8_t selectedXmod;
-    uint8_t phase[ch];
+
     int selectedChannel = 0;
     int selectedParam = 0;
     int sample[ch];
