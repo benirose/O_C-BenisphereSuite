@@ -37,7 +37,7 @@ ProbMeloD has a range of 5 octaves. Lower and upper range are displays in an _oc
 
 ## Pairing with ProbDiv and Looping
 
-ProbMeloD does not have any looping functionality on its own, but can loop when paired with [ProbDiv](ProbDiv). Like ProbDiv, a new loop is generated in both applets when any parameter in ProbDiv or ProbMeloD are changed. If ProbDiv and ProbMeloD are loaded in each hemisphere, they will automatically link. Clock division outputs from ProbDiv will automatically trigger ProbMeloD, and ProbMeloD will capture a loop when ProbDiv is looping as well. When used together they can be treated as a whole probabilistic sequencer!
+ProbMeloD does not have any looping functionality on its own, but can loop when paired with [ProbDiv](ProbDiv). If ProbDiv and ProbMeloD are loaded in each hemisphere, they will automatically link. Clock division outputs from ProbDiv will automatically trigger ProbMeloD, and ProbMeloD will capture a loop when ProbDiv is looping as well. When used together they can be treated as a whole probabilistic sequencer! As of v1.11, loops are now deterministic. This means once you lock in a loop, changing a probability and then changing it back will result in the same loop you started with. Additionally, loop seeds are now saved as of v1.11, which means you can recall the loop across presets and power cycles.
 
 ## Scale Mask Rotation
 
